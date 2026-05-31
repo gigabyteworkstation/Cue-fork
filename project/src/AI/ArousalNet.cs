@@ -413,6 +413,7 @@ namespace Cue
 
         // --- round 2: boredom / novelty / climax gate ----------------------
         private float boredom_         = 0f;   // 0..1, rises with repetition, lowers arousal & blocks climax
+        private float warmth_          = 0f;   // 0..1, slow build-up from sustained engagement, raises the plateau
         private float climaxReadiness_ = 0f;   // 0..1, must fill before she can actually orgasm
         private float climaxGateCap_   = 0.90f;// hard ceiling on arousal until readiness fills (breathes)
         private float falloffRate_     = 0f;   // current detumescence rate, consumed by Mood
@@ -509,6 +510,7 @@ namespace Cue
             rhythmHead_       = 0;
 
             boredom_          = 0f;
+            warmth_           = 0f;
             climaxReadiness_  = 0f;
             climaxGateCap_    = 0.90f;
             falloffRate_      = 0f;
@@ -564,6 +566,7 @@ namespace Cue
             o.Add("learnedPace",  new JSONData(learnedPace_));
             o.Add("familiarity",  new JSONData(familiarityBonus_));
             o.Add("boredom",      new JSONData(boredom_));
+            o.Add("warmth",       new JSONData(warmth_));
             o.Add("climaxReady",  new JSONData(climaxReadiness_));
             o.Add("orgasmCount",  new JSONData(orgasmCount_));
 
@@ -592,6 +595,7 @@ namespace Cue
             J.OptFloat(o, "learnedPace",  ref learnedPace_);
             J.OptFloat(o, "familiarity",  ref familiarityBonus_);
             J.OptFloat(o, "boredom",      ref boredom_);
+            J.OptFloat(o, "warmth",       ref warmth_);
             J.OptFloat(o, "climaxReady",  ref climaxReadiness_);
             J.OptInt(o,   "orgasmCount",  ref orgasmCount_);
         }
@@ -642,11 +646,12 @@ namespace Cue
         {
             get
             {
-                if (!IsPenetrated && urgeIntensity_ < 0.05f && totalStim_ < 0.05f)
+                if (!IsPenetrated && urgeIntensity_ < 0.05f && totalStim_ < 0.05f && warmth_ < 0.05f)
                     return 0f;
 
                 float ceil = Mathf.Clamp01(
-                    urgeIntensity_ * 0.70f + totalStim_ * 0.50f + edgeFactor_ * 0.35f);
+                    urgeIntensity_ * 0.60f + totalStim_ * 0.45f
+                    + edgeFactor_ * 0.30f + warmth_ * 0.50f);
 
                 // Boredom drains the sustainable level a little while penetrated
                 // (noticeable, but it must not park her at a low standstill --
@@ -911,6 +916,18 @@ namespace Cue
                 (adaptedStim + noveltyPulse_ * 0.30f) * habituationPenalty * boredomPenalty);
             totalStim_               = Lerp(totalStim_, targetTotalStim, SmoothRate);
 
+            // --- warmth: slow arousal build-up -----------------------------
+            // Real arousal accumulates with sustained engagement. Without it the
+            // plateau is capped by *instantaneous* stim, so moderate dildo motion
+            // parks her near 0.5. Warmth creeps up while she's actively worked
+            // and feeds the ceiling, so steady play climbs over ~30s to a high
+            // plateau (the climax gate still keeps it below 1.0 until ready).
+            if (active && totalStim_ > 0.20f)
+                warmth_ = Mathf.Min(
+                    warmth_ + dt * 0.030f * personality_.Responsiveness * (0.5f + totalStim_), 1f);
+            else
+                warmth_ = Mathf.Max(warmth_ - dt * 0.05f, 0f);
+
             isStalling_          = false;
             currentBarrierStatus_ = 1f;
 
@@ -1067,6 +1084,7 @@ namespace Cue
             debugLines_.Add("habituation",   habituation_.ToString("0.00"));
             debugLines_.Add("frustration",   frustration_.ToString("0.00"));
             debugLines_.Add("boredom",       boredom_.ToString("0.00"));
+            debugLines_.Add("warmth",        warmth_.ToString("0.00"));
             debugLines_.Add("variety",       varietySignal_.ToString("0.00"));
             debugLines_.Add("climaxReady",   climaxReadiness_.ToString("0.00"));
             debugLines_.Add("gateCap",       climaxGateCap_.ToString("0.00"));

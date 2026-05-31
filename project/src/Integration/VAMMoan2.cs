@@ -462,9 +462,13 @@ namespace Cue.VamMoan2
         }
 
         public void SetMoaning(float v)    { p_.setArousal.Value = v; ChangeState("Moaning"); }
-        public void SetBreathing()         { ChangeState("Breathing Idle"); }
-        public void SetSilent()            { ChangeState("Disabled"); }
-        public void SetKissing()           { ChangeState("Kissing"); }
+        // Breathing/Silent/Kissing only happen well outside an orgasm, so they
+        // double as a safety net that re-arms reactions if the orgasm latch is
+        // somehow still set (SetMoaning is deliberately excluded -- it's also
+        // used for the dips *within* an orgasm wave).
+        public void SetBreathing()         { ExitOrgasm(); ChangeState("Breathing Idle"); }
+        public void SetSilent()            { ExitOrgasm(); ChangeState("Disabled"); }
+        public void SetKissing()           { ExitOrgasm(); ChangeState("Kissing"); }
 
         public void SetOrgasm()
         {

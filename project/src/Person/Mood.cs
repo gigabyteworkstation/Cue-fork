@@ -562,6 +562,11 @@ namespace Cue
 
 						person_.ArousalSystem?.NotifyOrgasmEnded();
 
+						// Authoritative end-of-orgasm: clear the VAMMoan2 orgasm
+						// latch so reactions / one-liners resume (they're gated on
+						// !inOrgasm_, and ExitOrgasm was never being called).
+						vamVoice?.ExitOrgasm();
+
 						SetState(PostOrgasmState);
 						person_.Options.GetAnimationOption(AnimationType.Orgasm).Trigger(false);
 					}
