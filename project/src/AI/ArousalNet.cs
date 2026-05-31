@@ -648,8 +648,10 @@ namespace Cue
                 float ceil = Mathf.Clamp01(
                     urgeIntensity_ * 0.70f + totalStim_ * 0.50f + edgeFactor_ * 0.35f);
 
-                // Boredom drains the sustainable level even while penetrated.
-                ceil *= (1f - boredom_ * 0.40f);
+                // Boredom drains the sustainable level a little while penetrated
+                // (noticeable, but it must not park her at a low standstill --
+                // its real bite is on the climax gate, not the plateau height).
+                ceil *= (1f - boredom_ * 0.18f);
 
                 // Hold strictly below 1.0 until the climax gate opens (Update).
                 return Mathf.Min(ceil, climaxGateCap_);
@@ -878,17 +880,28 @@ namespace Cue
             varietySignal_ = Lerp(varietySignal_, varietyRaw, dt * 1.5f);
             noveltyPulse_  = Mathf.Max(0f, noveltyPulse_ - dt * 1.2f);
 
+            // Boredom relaxes toward a target set by how steady + repetitive the
+            // current stimulation is (scaled by NoveltyCraving). It rises slowly
+            // and falls quickly, and is deliberately bounded well below 1 so it
+            // never crushes arousal to a standstill -- its main job is to make
+            // *finishing* hard (it gates climaxReadiness below), not to flatten
+            // the plateau.
+            float boredomTarget;
             if (active && dwellSaturation_ > 0.15f)
             {
-                float steadiness = 1f - varietySignal_;
-                boredom_ += dt * traits_.BoredomRate * traits_.NoveltyCraving
-                          * steadiness * (0.5f + rhythmScore_ * 0.5f);
-                boredom_ -= dt * varietySignal_ * 0.5f;
+                float steadiness = Mathf.Clamp01(1f - varietySignal_ * 1.5f);
+                boredomTarget = steadiness * traits_.NoveltyCraving * 0.80f
+                              * (0.5f + rhythmScore_ * 0.5f);
             }
             else
             {
-                boredom_ -= dt * 0.10f;
+                boredomTarget = 0f;
             }
+
+            float boredomSpeed = (boredomTarget > boredom_)
+                ? traits_.BoredomRate * 2.5f   // builds gradually
+                : 0.40f;                        // fades quickly on variety / rest
+            boredom_ = Mathf.MoveTowards(boredom_, boredomTarget, dt * boredomSpeed);
             boredom_ = Mathf.Clamp01(boredom_);
 
             // --- consolidate stimulation -----------------------------------
@@ -1001,13 +1014,13 @@ namespace Cue
             float plateau = Mathf.Lerp(0.90f, 1.05f, climaxReadiness_);
             float breathe = 1f - climaxReadiness_;
             plateau -= Mathf.Abs(ProceduralNoise) * 0.12f * breathe;
-            plateau -= boredom_ * 0.18f * breathe;
-            climaxGateCap_ = Mathf.Clamp(plateau, 0.30f, 1.05f);
+            plateau -= boredom_ * 0.08f * breathe;
+            climaxGateCap_ = Mathf.Clamp(plateau, 0.55f, 1.05f);
 
             // Detumescence rate Mood applies when arousal sits above what the
             // current (cooling) stimulation can sustain. Boredom makes her cool
             // off noticeably faster.
-            falloffRate_ = traits_.ArousalFalloff * (1f + boredom_ * 2.0f) * (1.2f - totalStim_ * 0.6f);
+            falloffRate_ = traits_.ArousalFalloff * (1f + boredom_ * 1.0f) * (1.2f - totalStim_ * 0.6f);
 
             UpdateFuzzyStates();
         }
