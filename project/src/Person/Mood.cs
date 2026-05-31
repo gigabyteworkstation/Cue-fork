@@ -130,6 +130,8 @@ namespace Cue
 		private int state_ = NormalState;
 		private float elapsed_ = 0;
 		private float timeSinceLastOrgasm_ = NoOrgasm;
+		private int orgasmChain_ = 0;
+		private const int MaxOrgasmChain = 5;
 		private IEasing energyRampUpEasing_ = new LinearEasing();
 
 		private DampedFloat tiredness_ = new DampedFloat();
@@ -529,6 +531,28 @@ namespace Cue
 
 					if (elapsed_ >= ps.Get(PS.OrgasmTime))
 					{
+						var brain2 = person_.ArousalSystem?.brain_;
+
+						// Multi-orgasmic personalities roll straight into another
+						// wave while stimulation stays strong, rather than dropping
+						// into afterglow. Bounded so it can't loop forever.
+						if (brain2 != null && brain2.ShouldContinueOrgasm() && orgasmChain_ < MaxOrgasmChain)
+						{
+							orgasmChain_++;
+							elapsed_ = 0;
+
+							baseExcitement_.Value = 1;
+							Set(MoodType.Excited, baseExcitement_.Value);
+
+							person_.ArousalSystem.NotifyOrgasmBegun();
+							brain2.OnOrgasm();
+
+							if (vamVoice != null)
+								vamVoice.SetPerpetualOrgasm();
+
+							break;
+						}
+
 						person_.Animator.StopType(AnimationType.Orgasm);
 
 						tiredness_.UpRate = ps.Get(PS.TirednessRateDuringPostOrgasm);
@@ -653,8 +677,17 @@ namespace Cue
 
 			if (baseExcitement_.Value > ex.Max)
 			{
+				// Detumescence: fall toward the level the current stimulation can
+				// actually sustain. The brain supplies a dynamic falloff (much
+				// faster than the old fixed -0.01/s, and faster still when she's
+				// bored), so high arousal no longer freezes into a flat line.
+				var brain = person_.ArousalSystem?.brain_;
+				float legacy  = Math.Abs(ps.Get(PS.ExcitementDecayRate));
+				float falloff = brain?.FalloffRate ?? 0f;
+				float dec     = Math.Max(legacy, falloff);
+
 				baseExcitement_.Value = Math.Max(
-					baseExcitement_.Value + ps.Get(PS.ExcitementDecayRate) * s,
+					baseExcitement_.Value - dec * s,
 					ex.Max);
 			}
 			else
@@ -714,9 +747,20 @@ namespace Cue
 
 			person_.ArousalSystem?.NotifyOrgasmBegun();
 
+			var brain = person_.ArousalSystem?.brain_;
+			brain?.OnOrgasm();
+			orgasmChain_ = 0;
+
 			var vamVoice = person_.Voice.Provider as VamMoan2.Voice;
 			if (vamVoice != null)
-				vamVoice.SetOrgasmImmediate();
+			{
+				// Sustained/perpetual loop for the multi-orgasmic types under
+				// strong continued stimulation; a normal one-shot otherwise.
+				if (brain != null && brain.ShouldPerpetualOrgasm())
+					vamVoice.SetPerpetualOrgasm();
+				else
+					vamVoice.SetOrgasmImmediate();
+			}
 
 			SetState(OrgasmState);
 			timeSinceLastOrgasm_ = 0;

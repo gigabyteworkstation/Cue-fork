@@ -162,6 +162,18 @@ namespace Cue
         public readonly float DwellPleasure;
         public readonly float PaceVarianceTolerrance;
 
+        // --- round 2: dynamics / orgasm-difficulty traits -------------------
+        // Appended at the end on purpose: the RNG is consumed sequentially, so
+        // adding draws here keeps every trait above identical for a given seed.
+        public readonly float Orgasmicity;       // how readily climax tips over (low = easy arouse, hard finish)
+        public readonly float NoveltyCraving;    // how fast she bores of a repeated pace and craves change
+        public readonly float PaceChangeReward;  // re-excitement gained from a pace/depth change
+        public readonly float PreferredDepth;    // innate favourite depth
+        public readonly float PreferredPace;     // innate favourite thrust interval (s)
+        public readonly float ClimaxBuildRate;   // base speed the climax gate fills
+        public readonly float ArousalFalloff;    // base detumescence rate when above the sustainable ceiling
+        public readonly float BoredomRate;        // how fast boredom accumulates
+
         public SeededTraits(int seed)
         {
             var rng = new System.Random(seed);
@@ -191,6 +203,15 @@ namespace Cue
             AngleSensitivity         = Rand(rng, 0.1f, 0.8f);
             DwellPleasure            = Rand(rng, 0.1f, 0.9f);
             PaceVarianceTolerrance   = Rand(rng, 0.1f, 0.6f);
+
+            Orgasmicity              = Rand(rng, 0.15f, 1.00f);
+            NoveltyCraving           = Rand(rng, 0.10f, 0.95f);
+            PaceChangeReward         = Rand(rng, 0.20f, 0.80f);
+            PreferredDepth           = Rand(rng, 0.30f, 0.95f);
+            PreferredPace            = Rand(rng, 0.30f, 1.40f);
+            ClimaxBuildRate          = Rand(rng, 0.18f, 0.55f);
+            ArousalFalloff           = Rand(rng, 0.04f, 0.14f);
+            BoredomRate              = Rand(rng, 0.03f, 0.12f);
         }
 
         private static float Rand(System.Random rng, float lo, float hi)
@@ -390,6 +411,18 @@ namespace Cue
         private float learnedPace_      = 1.0f;
         private float familiarityBonus_ = 0f;
 
+        // --- round 2: boredom / novelty / climax gate ----------------------
+        private float boredom_         = 0f;   // 0..1, rises with repetition, lowers arousal & blocks climax
+        private float climaxReadiness_ = 0f;   // 0..1, must fill before she can actually orgasm
+        private float climaxGateCap_   = 0.90f;// hard ceiling on arousal until readiness fills (breathes)
+        private float falloffRate_     = 0f;   // current detumescence rate, consumed by Mood
+        private float varietySignal_   = 0f;   // 0..1, how much the pace/depth is currently changing
+        private float noveltyPulse_    = 0f;   // transient excitement from a fresh change
+        private float paceEma_         = 0f;   // slow average pace, for variety detection
+        private float depthEma_        = 0f;   // slow average depth
+        private float lastExcitement_  = 0f;   // cached for fuzzy-state calc
+        private int   orgasmCount_      = 0;    // how many times she's finished this session
+
         private float girthContrib_     = 0f;
         private float angleContrib_     = 0f;
         private float dwellPleasure_    = 0f;
@@ -415,6 +448,9 @@ namespace Cue
             orgasmTraits_    = new OrgasmTraits(seed);
             orgasmState_     = new OrgasmState(orgasmTraits_);
             proceduralLayer_ = new ProceduralArousalLayer(traits_.NoiseSeed, traits_.ProceduralVariance);
+
+            learnedDepth_ = traits_.PreferredDepth;
+            learnedPace_  = traits_.PreferredPace;
 
             if (personality != null)
             {
@@ -443,7 +479,48 @@ namespace Cue
 
                 if (personalitySeeded_)
                     personality_ = DerivePersonality(seed);
+
+                // A fresh seed is a fresh person: wipe everything she has
+                // "learned" / accumulated so old preferences and fatigue don't
+                // bleed into the new personality.
+                ResetLearnedState();
             }
+        }
+
+        // Clears all runtime memory and accumulators back to a cold start.
+        // Innate preferences are re-seeded from the (new) traits.
+        public void ResetLearnedState()
+        {
+            arousalDeltaBias_ = 0f;
+            urgeIntensity_    = 0f;
+            edgeFactor_       = 0f;
+            totalStim_        = 0f;
+            habituation_      = 0f;
+            frustration_      = 0f;
+            momentumAccum_    = 0f;
+            edgePressure_     = 0f;
+            dwellSaturation_  = 0f;
+            familiarityBonus_ = 0f;
+            girthContrib_     = 0f;
+            angleContrib_     = 0f;
+            dwellPleasure_    = 0f;
+            rhythmScore_      = 0f;
+            rhythmCount_      = 0;
+            rhythmHead_       = 0;
+
+            boredom_          = 0f;
+            climaxReadiness_  = 0f;
+            climaxGateCap_    = 0.90f;
+            falloffRate_      = 0f;
+            varietySignal_    = 0f;
+            noveltyPulse_     = 0f;
+            paceEma_          = 0f;
+            depthEma_         = 0f;
+            lastExcitement_   = 0f;
+            orgasmCount_      = 0;
+
+            learnedDepth_     = traits_.PreferredDepth;
+            learnedPace_      = traits_.PreferredPace;
         }
 
         public void SetPersonality(ArousalPersonality p)
@@ -486,6 +563,9 @@ namespace Cue
             o.Add("learnedDepth", new JSONData(learnedDepth_));
             o.Add("learnedPace",  new JSONData(learnedPace_));
             o.Add("familiarity",  new JSONData(familiarityBonus_));
+            o.Add("boredom",      new JSONData(boredom_));
+            o.Add("climaxReady",  new JSONData(climaxReadiness_));
+            o.Add("orgasmCount",  new JSONData(orgasmCount_));
 
             return o;
         }
@@ -511,6 +591,9 @@ namespace Cue
             J.OptFloat(o, "learnedDepth", ref learnedDepth_);
             J.OptFloat(o, "learnedPace",  ref learnedPace_);
             J.OptFloat(o, "familiarity",  ref familiarityBonus_);
+            J.OptFloat(o, "boredom",      ref boredom_);
+            J.OptFloat(o, "climaxReady",  ref climaxReadiness_);
+            J.OptInt(o,   "orgasmCount",  ref orgasmCount_);
         }
 
         public void GetExcitementFactors(out float physicalMul, out float emotionalMul, out float burst)
@@ -562,9 +645,64 @@ namespace Cue
                 if (!IsPenetrated && urgeIntensity_ < 0.05f && totalStim_ < 0.05f)
                     return 0f;
 
-                return Mathf.Clamp01(
+                float ceil = Mathf.Clamp01(
                     urgeIntensity_ * 0.70f + totalStim_ * 0.50f + edgeFactor_ * 0.35f);
+
+                // Boredom drains the sustainable level even while penetrated.
+                ceil *= (1f - boredom_ * 0.40f);
+
+                // Hold strictly below 1.0 until the climax gate opens (Update).
+                return Mathf.Min(ceil, climaxGateCap_);
             }
+        }
+
+        // Detumescence rate (per second) Mood should use when arousal is above
+        // the currently sustainable ceiling -- replaces the old fixed -0.01/s.
+        public float FalloffRate     { get { return falloffRate_; } }
+        public float Boredom         { get { return boredom_; } }
+        public float ClimaxReadiness { get { return climaxReadiness_; } }
+        public float VarietySignal   { get { return varietySignal_; } }
+        public int   OrgasmCount     { get { return orgasmCount_; } }
+
+        // Called by Mood when an orgasm starts: counts it, drops readiness, and
+        // -- after a couple of repeats on the same pattern -- drifts her learned
+        // preferences so the identical motion becomes less effective (she wants
+        // something new).
+        public void OnOrgasm()
+        {
+            orgasmCount_++;
+            climaxReadiness_ = 0f;
+            edgePressure_    = 0f;
+            frustration_     = 0f;
+
+            if (orgasmCount_ >= 2)
+            {
+                float drift = traits_.NoveltyCraving * 0.25f;
+                float sign  = (UnityEngine.Random.value < 0.5f) ? -1f : 1f;
+
+                learnedDepth_ = Mathf.Clamp01(learnedDepth_ + sign * drift);
+                learnedPace_  = Mathf.Max(0.1f, learnedPace_ * (1f + sign * drift));
+                boredom_      = Mathf.Min(1f, boredom_ + traits_.NoveltyCraving * 0.20f);
+            }
+        }
+
+        // She should kick straight into a sustained/perpetual orgasm vocal loop.
+        public bool ShouldPerpetualOrgasm()
+        {
+            return orgasmTraits_.IsMult
+                && orgasmTraits_.MultiOrgasmPropensity > 0.70f
+                && IsPenetrated
+                && totalStim_ > 0.55f;
+        }
+
+        // She's a multi-orgasmic type and stimulation is still strong enough to
+        // roll straight into another wave instead of dropping into afterglow.
+        public bool ShouldContinueOrgasm()
+        {
+            return orgasmTraits_.IsMult
+                && IsPenetrated
+                && totalStim_ > 0.50f
+                && urgeIntensity_ > 0.55f;
         }
 
         public void NotifyOrgasmBegun()
@@ -715,8 +853,49 @@ namespace Cue
                 habituation_ = Mathf.Max(habituation_ - dt * traits_.HabituationRate * 2.0f, 0f);
             }
 
+            // --- variety / boredom -----------------------------------------
+            // Detect how much the *pattern* is actually changing. A steady,
+            // unvarying pace at high engagement breeds boredom (scaled by
+            // NoveltyCraving), which cools her down now and blocks the climax
+            // gate later. A genuine change injects a novelty pulse that
+            // re-excites and relieves boredom -- this is what makes "change it
+            // up" matter.
+            paceEma_  = Lerp(paceEma_,  currentPace_, dt * 0.30f);
+            depthEma_ = Lerp(depthEma_, CurrentDepth, dt * 0.30f);
+
+            float paceDev = currentPace_ > 0.05f
+                ? Mathf.Min(Mathf.Abs(currentPace_ - paceEma_) / Mathf.Max(paceEma_, 0.1f), 1f)
+                : 0f;
+            float depthDev   = Mathf.Abs(CurrentDepth - depthEma_);
+            float varietyRaw = Mathf.Clamp01(paceDev * 0.7f + depthDev * 1.5f);
+
+            if (varietyRaw - varietySignal_ > 0.25f)
+            {
+                noveltyPulse_ = traits_.PaceChangeReward;
+                boredom_      = Mathf.Max(0f, boredom_ - 0.25f);
+            }
+
+            varietySignal_ = Lerp(varietySignal_, varietyRaw, dt * 1.5f);
+            noveltyPulse_  = Mathf.Max(0f, noveltyPulse_ - dt * 1.2f);
+
+            if (active && dwellSaturation_ > 0.15f)
+            {
+                float steadiness = 1f - varietySignal_;
+                boredom_ += dt * traits_.BoredomRate * traits_.NoveltyCraving
+                          * steadiness * (0.5f + rhythmScore_ * 0.5f);
+                boredom_ -= dt * varietySignal_ * 0.5f;
+            }
+            else
+            {
+                boredom_ -= dt * 0.10f;
+            }
+            boredom_ = Mathf.Clamp01(boredom_);
+
+            // --- consolidate stimulation -----------------------------------
             float habituationPenalty = 1f - (habituation_ * 0.4f);
-            float targetTotalStim    = Mathf.Clamp01(adaptedStim * habituationPenalty);
+            float boredomPenalty     = 1f - (boredom_ * 0.6f);
+            float targetTotalStim    = Mathf.Clamp01(
+                (adaptedStim + noveltyPulse_ * 0.30f) * habituationPenalty * boredomPenalty);
             totalStim_               = Lerp(totalStim_, targetTotalStim, SmoothRate);
 
             isStalling_          = false;
@@ -788,6 +967,48 @@ namespace Cue
             urgeIntensity_    = Lerp(urgeIntensity_,    targetUrge,  SmoothRate);
             edgeFactor_       = Lerp(edgeFactor_,       targetEdge,  SmoothRate * 0.5f);
 
+            // --- climax gate -----------------------------------------------
+            // Arousal can't actually reach orgasm until this readiness fills.
+            // It builds from being near the top WITH variety and WITHOUT
+            // boredom, scaled by Orgasmicity -- so a low-Orgasmicity person will
+            // hover at the edge almost indefinitely unless you change things up.
+            lastExcitement_ = excitement;
+
+            float nearTop = Mathf.Clamp01(
+                (effectiveArousal - traits_.EdgeThreshold) /
+                Mathf.Max(1f - traits_.EdgeThreshold, 0.05f));
+
+            if (active && nearTop > 0f)
+            {
+                float varietyFactor = 0.40f + varietySignal_ * 1.20f;  // steady~0.4 .. varied~1.6
+                float notBored      = 1f - boredom_ * 0.90f;
+                float build = traits_.ClimaxBuildRate * personality_.Sensitivity
+                            * traits_.Orgasmicity * varietyFactor * notBored
+                            * targetTotalStim * nearTop;
+                climaxReadiness_ += dt * build;
+            }
+            else
+            {
+                climaxReadiness_ -= dt * 0.15f;
+            }
+            climaxReadiness_ = Mathf.Clamp01(climaxReadiness_);
+
+            // The plateau the body holds at: opens above 1.0 only once ready,
+            // and -- while still building -- "breathes" with procedural noise +
+            // boredom so high arousal is never a flat line (this kills the
+            // constant-moan problem). The breathing/boredom suppression fades as
+            // readiness fills, so a fully-ready body reliably tips over.
+            float plateau = Mathf.Lerp(0.90f, 1.05f, climaxReadiness_);
+            float breathe = 1f - climaxReadiness_;
+            plateau -= Mathf.Abs(ProceduralNoise) * 0.12f * breathe;
+            plateau -= boredom_ * 0.18f * breathe;
+            climaxGateCap_ = Mathf.Clamp(plateau, 0.30f, 1.05f);
+
+            // Detumescence rate Mood applies when arousal sits above what the
+            // current (cooling) stimulation can sustain. Boredom makes her cool
+            // off noticeably faster.
+            falloffRate_ = traits_.ArousalFalloff * (1f + boredom_ * 2.0f) * (1.2f - totalStim_ * 0.6f);
+
             UpdateFuzzyStates();
         }
 
@@ -799,12 +1020,25 @@ namespace Cue
             States.Responding   = Mathf.Clamp01(totalStim_ * 1.5f);
             States.Enjoying     = Mathf.Clamp01((urgeIntensity_ - 0.2f) * 2f);
             States.Craving      = Mathf.Clamp01((urgeIntensity_ - 0.6f) * 2.5f);
-            States.Peaking      = Mathf.Clamp01(totalStim_ * edgeFactor_ * 2f);
-            States.Edging       = edgeFactor_;
-            States.Desperate    = Mathf.Clamp01(edgeFactor_ * frustration_ * 2f);
-            States.Stalled      = isStalling_ ? 1f : 0f;
-            States.Desensitized = habituation_;
-            States.Frustrated   = frustration_;
+            // nearTop = how close arousal is to the climax threshold.
+            float nearTop = Mathf.Clamp01(
+                (lastExcitement_ - traits_.EdgeThreshold) /
+                Mathf.Max(1f - traits_.EdgeThreshold, 0.05f));
+
+            // Edging is genuinely "held near the top but not allowed to finish":
+            // high arousal with the climax gate still shut. This makes the state
+            // reachable (it used to be raw edgeFactor and almost never lit up).
+            States.Edging       = Mathf.Clamp01(
+                nearTop * (1f - climaxReadiness_) * (0.6f + edgePressure_ * 0.8f)
+                + edgeFactor_ * 0.3f);
+
+            // Peaking is the opposite: near the top AND ready to go over.
+            States.Peaking      = Mathf.Clamp01(nearTop * climaxReadiness_ * 1.6f);
+
+            States.Desperate    = Mathf.Clamp01(States.Edging * (frustration_ + boredom_) * 1.5f);
+            States.Stalled      = isStalling_ ? 1f : Mathf.Clamp01(boredom_ * nearTop * 1.5f);
+            States.Desensitized = Mathf.Max(habituation_, boredom_);
+            States.Frustrated   = Mathf.Clamp01(frustration_ + boredom_ * 0.4f);
             States.OrgasmWave   = orgasmState_.Active ? orgasmState_.Intensity : 0f;
         }
 
@@ -819,6 +1053,12 @@ namespace Cue
             debugLines_.Add("momentum",      momentumAccum_.ToString("0.00"));
             debugLines_.Add("habituation",   habituation_.ToString("0.00"));
             debugLines_.Add("frustration",   frustration_.ToString("0.00"));
+            debugLines_.Add("boredom",       boredom_.ToString("0.00"));
+            debugLines_.Add("variety",       varietySignal_.ToString("0.00"));
+            debugLines_.Add("climaxReady",   climaxReadiness_.ToString("0.00"));
+            debugLines_.Add("gateCap",       climaxGateCap_.ToString("0.00"));
+            debugLines_.Add("falloff",       falloffRate_.ToString("0.000"));
+            debugLines_.Add("orgasmCount",   orgasmCount_.ToString());
             debugLines_.Add("barrierStat",   currentBarrierStatus_.ToString("0.00"));
             debugLines_.Add("procNoise",     ProceduralNoise.ToString("0.00"));
             debugLines_.Add("girthContrib",  girthContrib_.ToString("0.00"));
@@ -851,6 +1091,11 @@ namespace Cue
             debugLines_.Add("  girthSens",   traits_.GirthSensitivity.ToString("0.00"));
             debugLines_.Add("  climaxRes",   traits_.ClimaxResistance.ToString("0.00"));
             debugLines_.Add("  procVar",     traits_.ProceduralVariance.ToString("0.00"));
+            debugLines_.Add("  orgasmicity", traits_.Orgasmicity.ToString("0.00"));
+            debugLines_.Add("  noveltyCrav", traits_.NoveltyCraving.ToString("0.00"));
+            debugLines_.Add("  paceReward",  traits_.PaceChangeReward.ToString("0.00"));
+            debugLines_.Add("  climaxBuild", traits_.ClimaxBuildRate.ToString("0.00"));
+            debugLines_.Add("  arousalFall", traits_.ArousalFalloff.ToString("0.00"));
             debugLines_.Add("orgasmTraits:", "");
             debugLines_.Add("  duration",    orgasmTraits_.OrgasmDuration.ToString("0.0"));
             debugLines_.Add("  vocality",    orgasmTraits_.OrgasmVocality.ToString("0.00"));

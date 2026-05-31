@@ -60,6 +60,48 @@ The breathing/moaning balance now tracks arousal continuously
 (`UpdateDynamicMoanRatio`), starting from the user-configured baseline ratio and
 shifting toward mostly-moaning as she builds, instead of staying fixed.
 
+## Round 2 — lifelike dynamics
+
+Addresses: decay too slow (constant moaning at the top), arousal sometimes
+rising too fast, edging state unreachable, "easy to arouse / hard to finish"
+personalities, boredom of a repeated pace, conditional perpetual/multi-orgasm,
+and resetting learned state on seed regen.
+
+* **Climax gate.** Arousal now plateaus *below* 1.0 and only tips into orgasm
+  once a separate `climaxReadiness` accumulator fills. Readiness builds from
+  high arousal **with variety** and **without boredom**, scaled by the new
+  `Orgasmicity` trait — a low-Orgasmicity person can hover at the edge almost
+  indefinitely unless you change pace/depth. This makes the **Edging** state
+  reachable (it's now "near the top but the gate is shut") and gives real
+  control over how hard someone is to finish.
+* **Boredom / novelty.** A new `boredom` signal rises when the pace/depth stays
+  unvarying at high engagement (scaled by `NoveltyCraving`); it lowers the
+  sustainable ceiling, speeds decay, and blocks the climax gate. A genuine
+  pace/depth change fires a `noveltyPulse` that re-excites and relieves boredom.
+  So an unchanging rhythm makes her cool off and demand variety.
+* **Breathing plateau + real decay.** The plateau "breathes" with procedural
+  noise so high arousal is never a flat line, and Mood now uses a dynamic
+  brain-supplied `FalloffRate` (much faster than the old fixed `-0.01/s`, faster
+  still when bored) instead of freezing near the ceiling.
+* **Conditional perpetual & multi-orgasm.** `DoOrgasm` fires a sustained
+  perpetual vocal loop for multi-orgasmic types under strong continued
+  stimulation, and bounded multi-orgasm chains roll straight into another wave
+  while stimulation stays high.
+* **Reward / drift from past experience.** Matching her learned depth/pace still
+  rewards; after a couple of orgasms on the same pattern her learned preferences
+  drift and boredom seeds higher, so the identical motion gets less effective.
+* **Seed regen resets learning.** `SetSeed` now calls `ResetLearnedState()`,
+  wiping all accumulators/learned values (a fresh seed is a fresh person).
+* **New traits** (append-only so existing seeds keep their other traits):
+  `Orgasmicity`, `NoveltyCraving`, `PaceChangeReward`, `PreferredDepth`,
+  `PreferredPace`, `ClimaxBuildRate`, `ArousalFalloff`, `BoredomRate`. All new
+  signals are exposed in the AI-tab debug readout (boredom, variety,
+  climaxReady, gateCap, falloff, orgasmCount).
+
+Note: the climax gate governs the brain-driven (toy/dildo) interactions the
+ArousalSystem reads; legacy zone-driven sex still reaches climax through the
+original path, so existing scenes are not regressed.
+
 ## Files touched
 
 * `project/src/Person/Person.cs`
