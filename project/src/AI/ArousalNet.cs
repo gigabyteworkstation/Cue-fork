@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using SimpleJSON;
 using UnityEngine;
 
 namespace Cue
@@ -403,6 +404,8 @@ namespace Cue
 
         private DebugLines debugLines_ = new DebugLines();
 
+        private bool personalitySeeded_ = false;
+
         public ArousalBrain(Person p, int seed, ArousalPersonality personality = null)
         {
             person_          = p;
@@ -412,7 +415,20 @@ namespace Cue
             orgasmTraits_    = new OrgasmTraits(seed);
             orgasmState_     = new OrgasmState(orgasmTraits_);
             proceduralLayer_ = new ProceduralArousalLayer(traits_.NoiseSeed, traits_.ProceduralVariance);
-            personality_     = personality ?? ArousalPersonality.Default();
+
+            if (personality != null)
+            {
+                personality_       = personality;
+                personalitySeeded_ = false;
+            }
+            else
+            {
+                // Give every person a distinct, stable high-level temperament
+                // derived from their (persisted) seed, so two people no longer
+                // respond identically.
+                personality_       = DerivePersonality(seed);
+                personalitySeeded_ = true;
+            }
         }
 
         public void SetSeed(int seed)
@@ -424,12 +440,77 @@ namespace Cue
                 orgasmTraits_    = new OrgasmTraits(seed);
                 orgasmState_.SetTraits(orgasmTraits_);
                 proceduralLayer_ = new ProceduralArousalLayer(traits_.NoiseSeed, traits_.ProceduralVariance);
+
+                if (personalitySeeded_)
+                    personality_ = DerivePersonality(seed);
             }
         }
 
         public void SetPersonality(ArousalPersonality p)
         {
-            personality_ = p ?? ArousalPersonality.Default();
+            personality_       = p ?? ArousalPersonality.Default();
+            personalitySeeded_ = false;
+        }
+
+        private static ArousalPersonality DerivePersonality(int seed)
+        {
+            var rng = new System.Random(seed ^ 0x5F3759DF);
+
+            return new ArousalPersonality
+            {
+                Sensitivity    = 0.60f + (float)rng.NextDouble() * 1.10f,  // 0.60..1.70
+                Responsiveness = 0.50f + (float)rng.NextDouble() * 1.10f,  // 0.50..1.60
+                Stamina        = 0.60f + (float)rng.NextDouble() * 1.10f,  // 0.60..1.70
+                Inhibition     = (float)rng.NextDouble() * 0.50f           // 0.00..0.50
+            };
+        }
+
+        // Serialises the brain's slow-moving runtime memory so a saved scene
+        // resumes mid-arousal instead of snapping back to a cold start. The
+        // seed is included so the per-person traits stay identical across a
+        // save/load or a plugin reset.
+        public JSONClass ToJSON()
+        {
+            var o = new JSONClass();
+
+            o.Add("seed",         new JSONData(seed_));
+            o.Add("habituation",  new JSONData(habituation_));
+            o.Add("frustration",  new JSONData(frustration_));
+            o.Add("edgePressure", new JSONData(edgePressure_));
+            o.Add("edgeFactor",   new JSONData(edgeFactor_));
+            o.Add("urge",         new JSONData(urgeIntensity_));
+            o.Add("totalStim",    new JSONData(totalStim_));
+            o.Add("deltaBias",    new JSONData(arousalDeltaBias_));
+            o.Add("momentum",     new JSONData(momentumAccum_));
+            o.Add("dwell",        new JSONData(dwellSaturation_));
+            o.Add("learnedDepth", new JSONData(learnedDepth_));
+            o.Add("learnedPace",  new JSONData(learnedPace_));
+            o.Add("familiarity",  new JSONData(familiarityBonus_));
+
+            return o;
+        }
+
+        public void Load(JSONClass o)
+        {
+            if (o == null)
+                return;
+
+            int seed = seed_;
+            if (J.OptInt(o, "seed", ref seed))
+                SetSeed(seed);
+
+            J.OptFloat(o, "habituation",  ref habituation_);
+            J.OptFloat(o, "frustration",  ref frustration_);
+            J.OptFloat(o, "edgePressure", ref edgePressure_);
+            J.OptFloat(o, "edgeFactor",   ref edgeFactor_);
+            J.OptFloat(o, "urge",         ref urgeIntensity_);
+            J.OptFloat(o, "totalStim",    ref totalStim_);
+            J.OptFloat(o, "deltaBias",    ref arousalDeltaBias_);
+            J.OptFloat(o, "momentum",     ref momentumAccum_);
+            J.OptFloat(o, "dwell",        ref dwellSaturation_);
+            J.OptFloat(o, "learnedDepth", ref learnedDepth_);
+            J.OptFloat(o, "learnedPace",  ref learnedPace_);
+            J.OptFloat(o, "familiarity",  ref familiarityBonus_);
         }
 
         public void GetExcitementFactors(out float physicalMul, out float emotionalMul, out float burst)
@@ -461,6 +542,30 @@ namespace Cue
         public OrgasmState        OrgasmState      { get { return orgasmState_; } }
         public ArousalPersonality Personality      { get { return personality_; } }
         public string             StateString      { get { return States.GetDominantState(); } }
+
+        // Instantaneous bodily drive (0..1): how hard the body is being worked
+        // right now. Fed into the excitement *rate* so vigorous, well-matched
+        // stimulation actually moves arousal quickly.
+        public float PhysicalArousalDrive
+        {
+            get { return Mathf.Clamp01(totalStim_ * 0.70f + urgeIntensity_ * 0.45f + edgeFactor_ * 0.25f); }
+        }
+
+        // The arousal level the *current* stimulation can sustain (0..1). This
+        // lifts the excitement ceiling so toy/dildo scenes (which the legacy
+        // zone system barely registers) can build and climax, while collapsing
+        // to ~0 when nothing is happening so idle people don't drift upward.
+        public float ArousalCeiling
+        {
+            get
+            {
+                if (!IsPenetrated && urgeIntensity_ < 0.05f && totalStim_ < 0.05f)
+                    return 0f;
+
+                return Mathf.Clamp01(
+                    urgeIntensity_ * 0.70f + totalStim_ * 0.50f + edgeFactor_ * 0.35f);
+            }
+        }
 
         public void NotifyOrgasmBegun()
         {

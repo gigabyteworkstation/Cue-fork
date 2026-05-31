@@ -484,6 +484,11 @@ namespace Cue
 	{
 		private const float UpdateInterval = 1.0f;
 
+		// How strongly the arousal brain's instantaneous drive feeds the
+		// excitement rate (per second, before tiredness / global excitement
+		// scaling in Mood.UpdateExcitement).
+		private const float BrainDriveRate = 0.06f;
+
 		private Person person_;
 		private ExcitementSource[] sources_ = new ExcitementSource[SS.Count];
 		private ForceableFloat physicalRate_ = new ForceableFloat();
@@ -491,6 +496,7 @@ namespace Cue
 		private float subtotalRate_ = 0;
 		private float totalRate_ = 0;
 		private float max_ = 0;
+		private float brainMax_ = 0;
 		private float elapsed_ = 0;
 		private DebugLines debug_ = null;
 
@@ -519,7 +525,10 @@ namespace Cue
 
 		public float Max
 		{
-			get { return max_; }
+			// The arousal brain can only ever *raise* the ceiling (never lower
+			// it below the legacy zone maximum), so existing scenes are
+			// unaffected while toy/dildo stimulation can now build to climax.
+			get { return Math.Max(max_, brainMax_); }
 		}
 
 		public float PhysicalRate
@@ -589,9 +598,37 @@ namespace Cue
 				max_ = GetMaximum();
 
 				subtotalRate_ = physicalRate_.Value + emotionalRate_.Value;
-				totalRate_ = subtotalRate_ * person_.Personality.Get(PS.RateAdjustment);
-				float brainMul = 1f + (person_.ArousalSystem?.brain_.ArousalDeltaBias ?? 0f) * 0.5f;
-				totalRate_ = subtotalRate_ * person_.Personality.Get(PS.RateAdjustment) * brainMul;
+
+				// --- Arousal brain coupling ---------------------------------
+				// The brain used to only nudge the rate by +/-50%, so its rich
+				// stimulation model barely moved the actual arousal value. Now
+				// it does three things:
+				//   1. biases the legacy rate (delta bias),
+				//   2. adds a direct drive term so vigorous, well-matched
+				//      stimulation builds arousal on its own,
+				//   3. gates the whole thing through the climax barrier so the
+				//      final approach plateaus (edging) and then releases.
+				var brain = person_.ArousalSystem?.brain_;
+
+				float brainBias  = brain?.ArousalDeltaBias ?? 0f;     // -1..1
+				float brainDrive = brain?.PhysicalArousalDrive ?? 0f; // 0..1
+				float barrier    = brain?.BarrierStatus ?? 1f;        // <1 stalls, >1 pushes
+				float brainMul   = 1f + brainBias * 0.5f;
+
+				totalRate_  = subtotalRate_ * person_.Personality.Get(PS.RateAdjustment) * brainMul;
+
+				// Negligible drive is treated as zero so a truly idle person still
+				// hits the decay branch below instead of being held up by noise.
+				float brainAdd = brainDrive * BrainDriveRate * barrier;
+				if (brainAdd < 0.001f)
+					brainAdd = 0f;
+
+				totalRate_ += brainAdd;
+
+				// Let the brain lift the excitement ceiling toward what the
+				// current stimulation can sustain (see ArousalBrain.ArousalCeiling).
+				brainMax_ = brain?.ArousalCeiling ?? 0f;
+
 				if (totalRate_ == 0)
 				{
 					bool allowDecay = true;
@@ -683,6 +720,8 @@ namespace Cue
 
 			debug_.Add("values:");
 			debug_.Add($"  max: {max_:0.00000}");
+			if (brainMax_ > max_)
+				debug_.Add($"  brainMax: {brainMax_:0.00000} (lifting ceiling)");
 			debug_.Add($"  physical: {physicalRate_.Value:0.00000}");
 			debug_.Add($"  emotional: {emotionalRate_.Value:0.00000} (max {ps.Get(PS.MaxEmotionalRate):0.00000} from personality)");
 

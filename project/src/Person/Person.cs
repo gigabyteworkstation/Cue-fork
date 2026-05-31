@@ -29,6 +29,8 @@ namespace Cue
 		private bool loadPose_ = true;
 
 		private ArousalSystem arousalSystem_ = null;
+		private int arousalSeed_ = 0;
+		private JSONClass pendingArousalState_ = null;
 		public ArousalSystem ArousalSystem { get { return arousalSystem_; } }
 
 		public Person(int objectIndex, int personIndex, Sys.IAtom atom)
@@ -63,7 +65,25 @@ namespace Cue
 			Homing.Init();
 		
 
-			arousalSystem_ = new ArousalSystem(this, 12345);
+			// Each person gets a unique, stable arousal seed instead of the
+			// old hard-coded 12345 (which made every person behave identically).
+			// If the scene already saved a seed/state, Load() runs after Init()
+			// and stashes it in pendingArousalState_, which we apply here so the
+			// person keeps the exact same traits across a save/reload or reset.
+			// Non-negative so it matches the AI tab's seed slider range
+			// ([0, int.MaxValue]); 0 is avoided so it reads as "assigned".
+			if (arousalSeed_ == 0)
+				arousalSeed_ = (System.Guid.NewGuid().GetHashCode() & 0x7FFFFFFF) | 1;
+
+			arousalSystem_ = new ArousalSystem(this, arousalSeed_);
+
+			if (pendingArousalState_ != null)
+			{
+				arousalSystem_.Load(pendingArousalState_);
+				arousalSeed_ = arousalSystem_.Seed;
+				pendingArousalState_ = null;
+			}
+
 			hasBody_ = body_.Exists;
 
 			if (IsPlayer)
@@ -100,6 +120,24 @@ namespace Cue
 					personality_.Pose.Set(this);
 			}
 
+			if (r.HasKey("arousal"))
+			{
+				var ao = r["arousal"].AsObject;
+
+				if (arousalSystem_ != null)
+				{
+					arousalSystem_.Load(ao);
+					arousalSeed_ = arousalSystem_.Seed;
+				}
+				else
+				{
+					// Init() hasn't run yet; stash it and apply once the
+					// arousal system exists.
+					pendingArousalState_ = ao;
+					J.OptInt(ao, "seed", ref arousalSeed_);
+				}
+			}
+
 			Options.Load(r);
 		}
 
@@ -115,6 +153,9 @@ namespace Cue
 			var p = personality_.ToJSON();
 			if (p.Count > 0)
 				o.Add("personality", p);
+
+			if (arousalSystem_ != null)
+				o.Add("arousal", arousalSystem_.ToJSON());
 
 			return o;
 		}

@@ -1,4 +1,5 @@
 ﻿using System;
+using SimpleJSON;
 using UnityEngine;
 using Cue;
 
@@ -152,6 +153,29 @@ namespace Cue
         public void Destroy()
         {
             actuator_.Destroy();
+        }
+
+        public int Seed
+        {
+            get { return seed_; }
+            set { seed_ = value; brain_.SetSeed(value); }
+        }
+
+        public JSONClass ToJSON()
+        {
+            return brain_.ToJSON();
+        }
+
+        public void Load(JSONClass o)
+        {
+            if (o == null)
+                return;
+
+            int seed = seed_;
+            if (J.OptInt(o, "seed", ref seed))
+                seed_ = seed;
+
+            brain_.Load(o);
         }
 
         public string[] Debug()

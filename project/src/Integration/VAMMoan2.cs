@@ -19,6 +19,7 @@ namespace Cue.VamMoan2
         private bool  oneLinerPending_ = false;
 
         private float lastTotalStim_   = 0f;
+        private float reactionBaseline_= 0f;
         private float reactionCooldown_= 0f;
 
         public OneLinerScheduler(Voice v)
@@ -94,24 +95,36 @@ namespace Cue.VamMoan2
             }
 
             float currentStim = brain.TotalStim;
-            float stimDelta   = currentStim - lastTotalStim_;
             lastTotalStim_    = currentStim;
 
-            float reactionThreshold = 0.18f - (responsiveness * 0.05f);
+            // Reaction detection ------------------------------------------------
+            // The old code compared a single-frame delta of an already heavily
+            // smoothed signal against a large threshold, so genuine spikes almost
+            // never crossed it, and it was further gated behind "only if a
+            // one-liner is pending or we're in the first few seconds" -- which is
+            // why reactions felt janky and rarely fired when they should.
+            //
+            // Instead we track a slowly-following baseline and fire when the live
+            // stimulation surges meaningfully above its own recent average (a real
+            // "that caught me off guard" moment), regardless of what else is going
+            // on. Inhibition lowers the odds; responsiveness sharpens them.
+            reactionBaseline_ = Mathf.Lerp(reactionBaseline_, currentStim, s * 0.6f);
+            float surge = currentStim - reactionBaseline_;
 
-            if (stimDelta > reactionThreshold && reactionCooldown_ <= 0f)
+            float surgeThreshold = 0.10f - (responsiveness * 0.03f);
+
+            if (surge > surgeThreshold && currentStim > 0.12f && reactionCooldown_ <= 0f)
             {
-                if (oneLinerPending_ || globalElapsed_ < 3.5f)
+                float chance = Mathf.Clamp01(1f - inhibition * 0.6f);
+                if (UnityEngine.Random.value < chance)
                 {
-                    if (UnityEngine.Random.value > (inhibition * 0.5f))
-                    {
-                        log_.Info("Stimulation spike, catching her off-guard, interrupting speech");
-                        voice_.PlayReactionImmediate(GetNaturalIntensity(brain));
+                    log_.Info("stim surge -> reaction (surge=" + surge.ToString("0.00") + ")");
+                    voice_.PlayReactionImmediate(GetNaturalIntensity(brain));
 
-                        oneLinerPending_  = false;
-                        reactionCooldown_ = 8.0f;
-                        return;
-                    }
+                    oneLinerPending_  = false;               // interrupt any pending line
+                    reactionCooldown_ = Mathf.Lerp(3.5f, 1.5f, responsiveness * 0.5f);
+                    reactionBaseline_ = currentStim;         // avoid re-firing same surge
+                    return;
                 }
             }
 
@@ -277,6 +290,9 @@ namespace Cue.VamMoan2
         private float orgasmIntensityTarget_ = 1f;
         private float orgasmArousalValue_    = 1f;
 
+        private float dynMoanRatio_     = -1f;
+        private float lastSetMoanRatio_ = -1f;
+
         private Voice() {}
 
         public Voice(JSONClass o)
@@ -416,7 +432,33 @@ namespace Cue.VamMoan2
             }
 
             if (!inOrgasm_)
+            {
                 oneLiners_?.Update(s);
+                UpdateDynamicMoanRatio(s);
+            }
+        }
+
+        // Continuously shifts the breathing/moaning balance with arousal: she
+        // breathes more when calm and moans more as she builds, starting from
+        // the user-configured baseline ratio instead of staying fixed at it.
+        private void UpdateDynamicMoanRatio(float s)
+        {
+            var brain = person_?.ArousalSystem?.brain_;
+            if (brain == null) return;
+
+            float arousal = Mathf.Max(person_.Mood.Get(MoodType.Excited), brain.UrgeIntensity);
+            float target  = Mathf.Lerp(initMoanRatio_, 0.9f, arousal);
+
+            if (dynMoanRatio_ < 0f)
+                dynMoanRatio_ = target;
+
+            dynMoanRatio_ = Mathf.Lerp(dynMoanRatio_, target, s * 1.5f);
+
+            if (Mathf.Abs(dynMoanRatio_ - lastSetMoanRatio_) > 0.02f)
+            {
+                SetMoanRatio(dynMoanRatio_);
+                lastSetMoanRatio_ = dynMoanRatio_;
+            }
         }
 
         public void SetMoaning(float v)    { p_.setArousal.Value = v; ChangeState("Moaning"); }

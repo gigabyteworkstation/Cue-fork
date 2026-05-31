@@ -571,7 +571,32 @@ namespace Cue
 
 		public void Load(JSONClass o)
 		{
-			// no-op
+			if (o == null)
+				return;
+
+			var vals = Values;
+
+			if (o.HasKey("floats"))
+			{
+				var f = o["floats"].AsObject;
+				foreach (var fi in vals.GetFloatIndexes())
+				{
+					string n = vals.GetFloatName(fi);
+					if (f.HasKey(n))
+						Set(fi, f[n].AsFloat);
+				}
+			}
+
+			if (o.HasKey("bools"))
+			{
+				var b = o["bools"].AsObject;
+				foreach (var bi in vals.GetBoolIndexes())
+				{
+					string n = vals.GetBoolName(bi);
+					if (b.HasKey(n))
+						SetBool(bi, b[n].AsBool);
+				}
+			}
 		}
 
 		public JSONNode ToJSON()
@@ -581,8 +606,35 @@ namespace Cue
 			if (name_ != Resources.DefaultPersonality)
 				o.Add("name", name_);
 
-			var v = new JSONClass();
-			o.Add("voice", v);
+			// Persist runtime overrides (e.g. values tweaked through the AI tab)
+			// so personality state actually survives a scene save / plugin reset.
+			// Only values that differ from the personality's on-disk defaults are
+			// written, which keeps the save compact and forward-compatible.
+			Personality baseline = Resources.Personalities.Clone(name_, person_);
+
+			var vals   = Values;
+			var floats = new JSONClass();
+			var bools  = new JSONClass();
+
+			foreach (var fi in vals.GetFloatIndexes())
+			{
+				float cur = Get(fi);
+				if (baseline == null || cur != baseline.Get(fi))
+					floats.Add(vals.GetFloatName(fi), new JSONData(cur));
+			}
+
+			foreach (var bi in vals.GetBoolIndexes())
+			{
+				bool cur = GetBool(bi);
+				if (baseline == null || cur != baseline.GetBool(bi))
+					bools.Add(vals.GetBoolName(bi), new JSONData(cur));
+			}
+
+			if (floats.Count > 0)
+				o.Add("floats", floats);
+
+			if (bools.Count > 0)
+				o.Add("bools", bools);
 
 			return o;
 		}
