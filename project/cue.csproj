@@ -1,0 +1,380 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{84D6C6A2-B756-49CF-94A1-06651E46C4C1}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Cue</RootNamespace>
+    <AssemblyName>cue</AssemblyName>
+    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <NoStdLib>True</NoStdLib>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <LangVersion>6</LangVersion>
+    <TargetFrameworkProfile />
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <NoStdLib>True</NoStdLib>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;MOCK</DefineConstants>
+    <LangVersion>6</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <NoStdLib>True</NoStdLib>
+    <OutputPath>bin\Release\</OutputPath>
+    <LangVersion>6</LangVersion>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib">
+      <Aliases>global, mscorlib</Aliases>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\mscorlib.dll</HintPath>
+    </Reference>
+    <Reference Include="SteamVR">
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\SteamVR.dll</HintPath>
+    </Reference>    
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\System.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AIModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.AIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(VAMROOT)\VaM_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="src\AI\AI.cs" />
+    <Compile Include="src\AI\ArousalNet.cs" />
+    <Compile Include="src\AI\Events.cs" />
+    <Compile Include="src\AI\Events\Grab.cs" />
+    <Compile Include="src\AI\Events\Hand.cs" />
+    <Compile Include="src\AI\Events\HandLinker.cs" />
+    <Compile Include="src\AI\Events\HoldBreath.cs" />
+    <Compile Include="src\AI\Events\Kiss.cs" />
+    <Compile Include="src\AI\Events\Mouth.cs" />
+    <Compile Include="src\AI\Events\Smoke.cs" />
+    <Compile Include="src\AI\Events\SuckFinger.cs" />
+    <Compile Include="src\AI\Events\Thrust.cs" />
+    <Compile Include="src\AI\Events\Trib.cs" />
+    <Compile Include="src\AI\Events\Zap.cs" />
+    <Compile Include="src\AI\UrgeActuator.cs" />
+    <Compile Include="src\Animation\Animator.cs" />
+    <Compile Include="src\Animation\Builtin\Excited.cs" />
+    <Compile Include="src\Animation\Builtin\Finger.cs" />
+    <Compile Include="src\Animation\Builtin\Player.cs" />
+    <Compile Include="src\Animation\Builtin\Smoke.cs" />
+    <Compile Include="src\Animation\Builtin\Suck.cs" />
+    <Compile Include="src\Animation\Builtin\Thrust.cs" />
+    <Compile Include="src\Animation\BVH\BVH.cs" />
+    <Compile Include="src\Animation\BVH\BVHFile.cs" />
+    <Compile Include="src\Animation\BVH\BVHPlayer.cs" />
+    <Compile Include="src\Animation\Integration\ClockwiseBJ.cs" />
+    <Compile Include="src\Animation\Integration\ClockwiseHJ.cs" />
+    <Compile Include="src\Animation\Integration\ClockwiseKiss.cs" />
+    <Compile Include="src\Animation\Integration\Synergy.cs" />
+    <Compile Include="src\Animation\Integration\Timeline.cs" />
+    <Compile Include="src\Animation\Procedural\Animation.cs" />
+    <Compile Include="src\Animation\Procedural\Controller.cs" />
+    <Compile Include="src\Animation\Procedural\Force.cs" />
+    <Compile Include="src\Animation\Procedural\Group.cs" />
+    <Compile Include="src\Animation\Procedural\Morph.cs" />
+    <Compile Include="src\Animation\Procedural\Sync.cs" />
+    <Compile Include="src\Animation\Procedural\Target.cs" />
+    <Compile Include="src\Cue.cs" />
+    <Compile Include="src\Enums\Animations.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Animations.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Enums\BodyPartsEnum.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>BodyPartsEnum.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Enums\EnumValues.cs" />
+    <Compile Include="src\Enums\Instrumentation.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Instrumentation.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Enums\Moods.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Moods.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Enums\Sensitivities.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Sensitivities.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Instrumentation.cs" />
+    <Compile Include="src\Integration\ClothingManager.cs" />
+    <Compile Include="src\Integration\Embody.cs" />
+    <Compile Include="src\Integration\Interfaces.cs" />
+    <Compile Include="src\Integration\MacGruber.cs" />
+    <Compile Include="src\Integration\Objects.cs" />
+    <Compile Include="src\Integration\DiviningRod.cs" />
+    <Compile Include="src\Integration\DildoLanguage.cs" />
+    <Compile Include="src\Integration\Vam.cs" />
+    <Compile Include="src\Integration\VAMMoan.cs" />
+    <Compile Include="src\Integration\VAMMoan2.cs" />
+    <Compile Include="src\Main.cs" />
+    <Compile Include="src\Options\CustomMenuItems.cs" />
+    <Compile Include="src\Options\Options.cs" />
+    <Compile Include="src\Options\PersonOptions.cs" />
+    <Compile Include="src\Person\Body\Body.cs" />
+    <Compile Include="src\Person\Body\BodyPart.cs" />
+    <Compile Include="src\Person\Body\BodyParts.cs" />
+    <Compile Include="src\Person\Body\Hand.cs" />
+    <Compile Include="src\Person\Body\BodyPartLocker.cs" />
+    <Compile Include="src\Person\Body\Morph.cs" />
+    <Compile Include="src\Person\Body\Zone.cs" />
+    <Compile Include="src\Person\Excitement\Excitement.cs" />
+    <Compile Include="src\Person\Expression\Expression.cs" />
+    <Compile Include="src\Person\Expression\Manager.cs" />
+    <Compile Include="src\Person\Expression\WeightedExpression.cs" />
+    <Compile Include="src\Person\Finish.cs" />
+    <Compile Include="src\Person\Gaze\Events.cs" />
+    <Compile Include="src\Person\Gaze\Events\Above.cs" />
+    <Compile Include="src\Person\Gaze\Events\Custom.cs" />
+    <Compile Include="src\Person\Gaze\Events\Down.cs" />
+    <Compile Include="src\Person\Gaze\Events\Front.cs" />
+    <Compile Include="src\Person\Gaze\Events\Grabbed.cs" />
+    <Compile Include="src\Person\Gaze\Events\Hands.cs" />
+    <Compile Include="src\Person\Gaze\Events\Interactions.cs" />
+    <Compile Include="src\Person\Gaze\Events\Kiss.cs" />
+    <Compile Include="src\Person\Gaze\Events\Mouth.cs" />
+    <Compile Include="src\Person\Gaze\Events\Others.cs" />
+    <Compile Include="src\Person\Gaze\Events\Random.cs" />
+    <Compile Include="src\Person\Gaze\Events\Zapped.cs" />
+    <Compile Include="src\Person\Gaze\Gaze.cs" />
+    <Compile Include="src\Person\Gaze\Picker.cs" />
+    <Compile Include="src\Person\Gaze\Render.cs" />
+    <Compile Include="src\Person\Gaze\Targets.cs" />
+    <Compile Include="src\Person\Mood.cs" />
+    <Compile Include="src\Person\Object.cs" />
+    <Compile Include="src\Person\Person.cs" />
+    <Compile Include="src\Person\Personality.cs" />
+    <Compile Include="src\Person\Status.cs" />
+    <Compile Include="src\Person\Voice\State.cs" />
+    <Compile Include="src\Person\Voice\StateChoked.cs" />
+    <Compile Include="src\Person\Voice\StateKiss.cs" />
+    <Compile Include="src\Person\Voice\StateNormal.cs" />
+    <Compile Include="src\Person\Voice\StateOrgasm.cs" />
+    <Compile Include="src\Person\Voice\Voice.cs" />
+    <Compile Include="src\Person\Voice\StateBJ.cs" />
+    <Compile Include="src\Resources\Objects.cs" />
+    <Compile Include="src\Resources\Personalities.cs" />
+    <Compile Include="src\Resources\Resources.cs" />
+    <Compile Include="src\Sys\Interfaces.cs" />
+    <Compile Include="src\Sys\Mock.cs" />
+    <Compile Include="src\Sys\Vam\BodyParts\ColliderBodyPart.cs" />
+    <Compile Include="src\Sys\Vam\BodyParts\EyesBodyPart.cs" />
+    <Compile Include="src\Sys\Vam\BodyParts\RigidbodyBodyPart.cs" />
+    <Compile Include="src\Sys\Vam\BodyParts\StraponBodyPart.cs" />
+    <Compile Include="src\Sys\Vam\BodyParts\TriggerBodyPart.cs" />
+    <Compile Include="src\Sys\Vam\VamAtom.cs" />
+    <Compile Include="src\Sys\Vam\VamBody.cs" />
+    <Compile Include="src\Sys\Vam\VamBodyLoader.cs" />
+    <Compile Include="src\Sys\Vam\VamBodyParts.cs" />
+    <Compile Include="src\Sys\Vam\VamCameraAtom.cs" />
+    <Compile Include="src\Sys\Vam\VamCollisions.cs" />
+    <Compile Include="src\Sys\Vam\VamFixes.cs" />
+    <Compile Include="src\Sys\Vam\VamGraphic.cs" />
+    <Compile Include="src\Sys\Vam\VamHair.cs" />
+    <Compile Include="src\Sys\Vam\VamInput.cs" />
+    <Compile Include="src\Sys\Vam\VamLinker.cs" />
+    <Compile Include="src\Sys\Vam\VamLiveSaver.cs" />
+    <Compile Include="src\Sys\Vam\VamMorphs.cs" />
+    <Compile Include="src\Sys\Vam\VamObjects.cs" />
+    <Compile Include="src\Sys\Vam\VamParameter.cs" />
+    <Compile Include="src\Sys\Vam\VamSys.cs" />
+    <Compile Include="src\Sys\Vam\VamUtilities.cs" />
+    <Compile Include="src\UI\DesktopMenu.cs" />
+    <Compile Include="src\UI\Menu.cs" />
+    <Compile Include="src\UI\ScriptUI\AITab.cs" />
+    <Compile Include="src\UI\ScriptUI\ArousalTab.cs" />
+    <Compile Include="src\UI\ScriptUI\BodyTab.cs" />
+    <Compile Include="src\UI\ScriptUI\AnimationsTab.cs" />
+    <Compile Include="src\UI\ScriptUI\DumpTab.cs" />
+    <Compile Include="src\UI\ScriptUI\MiscTab.cs" />
+    <Compile Include="src\UI\ScriptUI\OptionsTab.cs" />
+    <Compile Include="src\UI\ScriptUI\RandomizerTab.cs" />
+    <Compile Include="src\UI\ScriptUI\ScriptUI.cs" />
+    <Compile Include="src\UI\ScriptUI\SettingsTab.cs" />
+    <Compile Include="src\UI\ScriptUI\StateTab.cs" />
+    <Compile Include="src\UI\UI.cs" />
+    <Compile Include="src\UI\VRMenu.cs" />
+    <Compile Include="src\Utilities\DebugDraw.cs" />
+    <Compile Include="src\Utilities\Duration.cs" />
+    <Compile Include="src\Utilities\Easings.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Easings.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Enums\PersonalityEnum.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>PersonalityEnum.tt</DependentUpon>
+    </Compile>
+    <Compile Include="src\Utilities\Floats.cs" />
+    <Compile Include="src\Utilities\Foostils.cs" />
+    <Compile Include="src\Utilities\Geo.cs" />
+    <Compile Include="src\Utilities\GeoRender.cs" />
+    <Compile Include="src\Utilities\Json.cs" />
+    <Compile Include="src\Utilities\Log.cs" />
+    <Compile Include="src\Utilities\PenetrationDetector.cs" />
+    <Compile Include="src\Utilities\PenetrationInfo.cs" />
+    <Compile Include="src\Utilities\PenetrationMonitor.cs" />
+    <Compile Include="src\Utilities\PersonalityRandomizer.cs" />
+    <Compile Include="src\Utilities\Random.cs" />
+    <Compile Include="src\Utilities\NatSort.cs" />
+    <Compile Include="src\Utilities\Utilities.cs" />
+    <Compile Include="src\Version.cs" />
+    <Compile Include="src\VUI\BorderLayout.cs" />
+    <Compile Include="src\VUI\Button.cs" />
+    <Compile Include="src\VUI\CheckBox.cs" />
+    <Compile Include="src\VUI\ColorPicker.cs" />
+    <Compile Include="src\VUI\ComboBox.cs" />
+    <Compile Include="src\VUI\Dialog.cs" />
+    <Compile Include="src\VUI\Events.cs" />
+    <Compile Include="src\VUI\Glue.cs" />
+    <Compile Include="src\VUI\GridLayout.cs" />
+    <Compile Include="src\VUI\Label.cs" />
+    <Compile Include="src\VUI\Layout.cs" />
+    <Compile Include="src\VUI\ListView.cs" />
+    <Compile Include="src\VUI\Misc.cs" />
+    <Compile Include="src\VUI\Panel.cs" />
+    <Compile Include="src\VUI\Root.cs" />
+    <Compile Include="src\VUI\Slider.cs" />
+    <Compile Include="src\VUI\Style.cs" />
+    <Compile Include="src\VUI\Support.cs" />
+    <Compile Include="src\VUI\Tabs.cs" />
+    <Compile Include="src\VUI\TextBox.cs" />
+    <Compile Include="src\VUI\Timer.cs" />
+    <Compile Include="src\VUI\Tooltip.cs" />
+    <Compile Include="src\VUI\TreeView.cs" />
+    <Compile Include="src\VUI\TypedList.cs" />
+    <Compile Include="src\VUI\Utilities.cs" />
+    <Compile Include="src\VUI\Version.cs" />
+    <Compile Include="src\VUI\Widget.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Enums\Enums.tt" />
+    <Content Include="src\Enums\Animations.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Animations.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Enums\BodyPartsEnum.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>BodyPartsEnum.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Enums\Instrumentation.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Instrumentation.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Enums\Moods.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Moods.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Enums\Sensitivities.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Sensitivities.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Utilities\Easings.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Easings.cs</LastGenOutput>
+    </Content>
+    <Content Include="src\Enums\PersonalityEnum.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>PersonalityEnum.cs</LastGenOutput>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>cd "$(ProjectDir)"
+call $(ProjectDir)list.bat $(ProjectDir)..\Cue.cslist</PostBuildEvent>
+  </PropertyGroup>
+</Project>

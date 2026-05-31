@@ -1,0 +1,51 @@
+﻿<#@ include file="Enums.tt" #><#
+var vars = new V[]
+{
+
+V.Value("None", -1),
+
+V.Value("Head"),
+V.Value("Neck"),
+V.Value("Lips"),
+V.Value("Mouth"),
+
+V.Value("LeftBreast"),
+V.Value("RightBreast"),
+
+V.Value("Vagina"),
+V.Value("Penis"),
+V.Value("Anus"),
+
+V.Value("Chest"),
+V.Value("Belly"),
+V.Value("Hips"),
+V.Value("LeftGlute"),
+V.Value("RightGlute"),
+
+V.Value("LeftShoulder"),
+V.Value("LeftArm"),
+V.Value("LeftElbow"),
+V.Value("LeftForearm"),
+V.Value("LeftHand"),
+
+V.Value("RightShoulder"),
+V.Value("RightArm"),
+V.Value("RightElbow"),
+V.Value("RightForearm"),
+V.Value("RightHand"),
+
+V.Value("LeftThigh"),
+V.Value("LeftKnee"),
+V.Value("LeftShin"),
+V.Value("LeftFoot"),
+
+V.Value("RightThigh"),
+V.Value("RightKnee"),
+V.Value("RightShin"),
+V.Value("RightFoot"),
+
+V.Value("Eyes"),
+
+};
+
+#><#= Generate(vars, "BodyPartType", "BodyParts", false, "BP") #>

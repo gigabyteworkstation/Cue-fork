@@ -1,0 +1,277 @@
+{
+	"name": "Horny",
+	"inherit": "base",
+
+	"voice":
+	{
+		"provider":
+		{
+			"name": "vammoan2",
+			"options":
+			{
+				"moanRatio":      0.8,
+				"mouthNoseRatio": 0.2,
+				"sfxPelvicSlap":  false,
+				"sfxSquishes":    false,
+				"sfxBlowjob":     false,
+				"sfxSpank":       false,
+				"allowVA":        true,
+				"lipSync":        true,
+
+				"oneliners":
+				[
+					{ "slot": 1, "context": "orgasmStart",      "cooldown": 30  },
+					{ "slot": 2, "context": "postOrgasm",       "cooldown": 60  },
+					{ "slot": 3, "context": "highExcitement",   "cooldown": 20  },
+					{ "slot": 4, "context": "penetrationStart", "cooldown": 30  },
+					{ "slot": 5, "context": "kissStart",        "cooldown": 10  },
+					{ "slot": 6, "context": "gropeStart",       "cooldown": 8   }
+				]
+			}
+		},
+
+		"normalState":
+		{
+			"enabled": true,
+			"breathingRange": 0.03,
+			"breathingIntensityCutoff": 0.3,
+			"intensityWait":
+			{
+				"range": [0, 1.5]
+			},
+			"intensityTarget":
+			{
+				"rng":
+				{
+					"type": "normal",
+					"centerMin": 0.5,
+					"centerMax": 1.0,
+					"width": 1.5
+				}
+			},
+			"intensityTime":
+			{
+				"range": [0, 0.8]
+			}
+		},
+
+		"kissState":
+		{
+			"enabled": true,
+			"voiceChance": 0.8,
+			"voiceChanceMinExcitement": 0.05,
+			"voiceTime": 1
+		},
+
+		"bjState":
+		{
+			"enabled": true,
+			"voiceChance": 0.8,
+			"voiceChanceMinExcitement": 0.05,
+			"voiceTime": 1
+		},
+
+		"orgasmState":
+		{
+			"enabled": true,
+			"voice": "perpetualOrgasm"
+		},
+
+		"chokedState":
+		{
+			"enabled": true,
+			"minTimeForMoaning": 1.5,
+			"moaningAfter": 0.8,
+			"moaningTime": 2.0
+		}
+	},
+
+
+	"rateAdjustment":          2.2,
+	"excitementDecayRate":     -0.002,
+	"excitementPostOrgasm":    0.65,
+	"orgasmTime":              10,
+	"postOrgasmTime":          5,
+	"penetrationDamper":       0.25,
+	"minCollisionMag":            0.03,
+	"minCollisionMagPenetration": 0.06,
+	"idleMaxExcitement":       0.15,
+
+
+	"orgasmVocality":              0.95,
+	"orgasmDurationMin":           6.0,
+	"orgasmDurationMax":           14.0,
+	"orgasmIntensityPeak":         1.0,
+	"orgasmBuildSharpness":        1.8,
+	"orgasmContractionRate":       2.5,
+	"orgasmContractionDepth":      0.7,
+	"orgasmSensitivityFlood":      0.9,
+	"orgasmAftershockCount":       2.0,
+	"orgasmAftershockDecay":       0.5,
+	"orgasmDelayThreshold":        0.0,
+	"multiOrgasmPropensity":       0.8,
+	"squirtPropensity":            0.4,
+	"bodyTensionMax":              0.9,
+	"postOrgasmHypersensitivity":  0.85,
+
+
+	"orgasmBaseTirednessIncrease":           0.04,
+	"tirednessRateDuringPostOrgasm":         0.08,
+	"tirednessBaseDecayRate":                0.02,
+	"tirednessBackToBaseRate":               0.06,
+	"delayAfterOrgasmUntilTirednessDecay":   2,
+	"tirednessMaxExcitementForBaseDecay":    0.95,
+	"movementEnergyRampUpDelayAfterOrgasm":  1,
+	"movementEnergyRampUpAfterOrgasm":       6,
+	"movementEnergyRampUpAfterOrgasmEasing": "quadin",
+	"movementEnergyTirednessFactor":         0.1,
+	"movementTirednessFactor":               0.0,
+
+
+	"defaultHappiness":                  0.9,
+	"defaultPlayfulness":                0.65,
+	"defaultSurprise":                   0.1,
+	"defaultAnger":                      0.0,
+	"maxHappyExpression":                1.0,
+	"maxExcitedExpression":              1.0,
+	"maxPlayfulExpression":              1.0,
+	"maxAngryExpression":                0.15,
+	"maxSurprisedExpression":            0.8,
+	"maxTiredExpression":                0.4,
+	"minTiredness":                      0,
+	"maxEmotionalRate":                  1.0,
+	"expressionExcitementFactor":        1.6,
+	"expressionTirednessFactor":         0.4,
+	"excitedExpressionWeightModifier":   3.5,
+	"exclusiveExpressionWeightModifier": 0.25,
+	"expressionMinHoldTime":             0,
+	"expressionMaxHoldTime":             1.5,
+	"orgasmExpressionRangeMin":          0.65,
+	"orgasmExpressionRangeMax":          1.0,
+	"orgasmFirstExpressionTime":         0.1,
+	"orgasmSyncMinExcitement":           0.65,
+
+
+	"naturalPlayerEyesWeight":           3.5,
+	"busyPlayerEyesWeight":              3.0,
+	"naturalOtherEyesWeight":            0.8,
+	"busyOtherEyesWeight":               1.0,
+	"otherEyesExcitementWeight":         2.5,
+	"otherEyesOrgasmWeight":             60,
+	"penetratedEyesWeight":              16.0,
+	"penetratedGenitalsWeight":          3.0,
+	"gropedEyesWeight":                  6.0,
+	"gropedTargetWeight":                2.5,
+	"blowjobEyesWeight":                 4.0,
+	"blowjobGenitalsWeight":             9.0,
+	"handjobEyesWeight":                 6.0,
+	"handjobGenitalsWeight":             3.0,
+	"maxTirednessForRandomGaze":         0.95,
+
+	"avoidGazePlayerMinExcitement":                       0,
+	"avoidGazePlayerMaxExcitement":                       0,
+	"avoidGazePlayerInsidePersonalSpaceMinExcitement":    0,
+	"avoidGazePlayerInsidePersonalSpaceMaxExcitement":    0,
+	"avoidGazePlayerDuringSexMinExcitement":               0,
+	"avoidGazePlayerDuringSexMaxExcitement":               0,
+	"avoidGazePlayerDelayAfterOrgasm":                    0,
+	"avoidGazePlayerWeight":                              0,
+	"avoidGazeOthersMinExcitement":                       0,
+	"avoidGazeOthersMaxExcitement":                       0,
+	"avoidGazeOthersInsidePersonalSpaceMinExcitement":    0,
+	"avoidGazeOthersInsidePersonalSpaceMaxExcitement":    0,
+	"avoidGazeOthersDuringSexMinExcitement":               0,
+	"avoidGazeOthersDuringSexMaxExcitement":               0,
+	"avoidGazeOthersDelayAfterOrgasm":                    0,
+	"avoidGazeOthersWeight":                              0,
+	"avoidGazeUninvolvedHavingSexMinExcitement":           0,
+	"avoidGazeUninvolvedHavingSexMaxExcitement":           0,
+
+
+	"maxSweat":                  1.0,
+	"maxFlush":                  0.85,
+	"maxChokedFlush":            1.0,
+	"flushRedMag":               0.28,
+	"temperatureExcitementRate": 0.05,
+	"temperatureDecayRate":      0.003,
+	"temperatureExcitementMax":  0.55,
+
+
+	"zappedEnabled":                        false,
+	"zappedTentativeTime":                  1.0,
+	"zappedCooldown":                       15,
+	"zappedTime":                           5,
+	"zappedGazeMinIntensity":               0.1,
+	"zappedByPlayerGenitalsExcitement":     0.85,
+	"zappedByPlayerBreastsExcitement":      0.45,
+	"zappedByPlayerPenetrationExcitement":  0.95,
+	"zappedByPlayerMouthExcitement":        0.3,
+	"zappedByOtherGenitalsExcitement":      0.65,
+	"zappedByOtherBreastsExcitement":       0.35,
+	"zappedByOtherPenetrationExcitement":   0.75,
+	"zappedByOtherMouthExcitement":         0.2,
+	"zappedByPlayerLookUpWeight":           8,
+	"zappedByPlayerLookAwayMaxExcitement":  0,
+	"zappedByPlayerGazeDuration":           [0.3, 0.15],
+	"zappedByOtherLookUpWeight":            5,
+	"zappedByOtherLookAwayMaxExcitement":   0,
+	"zappedByOtherGazeDuration":            [0.5, 0.3],
+
+
+	"sensitivities":
+	[
+		{
+			"type": "penetration",
+			"physicalRate":    0.009,
+			"physicalMax":     1.0,
+			"nonPhysicalRate": 0.004,
+			"nonPhysicalMax":  1.0,
+			"modifiers":
+			[
+				{ "source": "player",   "modifier": 2.5 },
+				{ "source": "external", "modifier": 6.0 }
+			]
+		},
+
+		{
+			"type": "mouth",
+			"physicalRate":    0.005,
+			"physicalMax":     0.8,
+			"nonPhysicalRate": 0.002,
+			"nonPhysicalMax":  0.5
+		},
+
+		{
+			"type": "breasts",
+			"physicalRate":    0.008,
+			"physicalMax":     0.75,
+			"nonPhysicalRate": 0.004,
+			"nonPhysicalMax":  0.55,
+			"modifiers":
+			[
+				{ "source": "player", "modifier": 3.0 },
+				{ "source": "self",   "modifier": 1.8 }
+			]
+		},
+
+		{
+			"type": "genitals",
+			"physicalRate":    0.016,
+			"physicalMax":     1.0,
+			"nonPhysicalRate": 0.007,
+			"nonPhysicalMax":  0.95,
+			"modifiers":
+			[
+				{ "source": "player",                            "modifier": 3.0 },
+				{ "source": "self",                             "modifier": 2.2 },
+				{ "source": "any", "sourcePart": "mouth",       "modifier": 2.8 }
+			]
+		},
+
+		{
+			"type": "othersExcitement",
+			"rate": 1.0,
+			"max":  0.5
+		}
+	]
+}

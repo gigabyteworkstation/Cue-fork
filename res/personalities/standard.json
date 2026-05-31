@@ -1,0 +1,14 @@
+{
+	"name": "Standard",
+	"inherit": "base",
+
+	// Override orgasm state to use perpetual loop for a more sustained response
+	"voice":
+	{
+		"orgasmState":
+		{
+			"enabled": true,
+			"voice": "perpetualOrgasm"
+		}
+	}
+}

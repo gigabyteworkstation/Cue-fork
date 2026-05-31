@@ -1,0 +1,2 @@
+C:\Users\ruthe\Downloads\RealisticSounds\project\obj\Debug\realisticSounds.csproj.AssemblyReference.cache
+C:\Users\ruthe\Downloads\RealisticSounds\project\obj\Debug\realisticSounds.csproj.CoreCompileInputs.cache

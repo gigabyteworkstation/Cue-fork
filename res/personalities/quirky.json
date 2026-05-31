@@ -1,0 +1,7 @@
+{
+	"name": "Quirky",
+	"inherit": "base",
+	"defaultHappiness": 1,
+	"defaultPlayfulness": 1,
+	"defaultAnger": 0,
+}

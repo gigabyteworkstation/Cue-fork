@@ -1,0 +1,49 @@
+{
+	"objects":
+	[
+		{
+			"name": "cigarette",
+			"type": "cua",
+			"options":
+			{
+				"url": "Custom/Assets/cigarette.assetbundle",
+				"name": "Assets/New Folder/Cigarette.unity"
+			}
+		},
+
+		{
+			"name": "cigaretteSmoke",
+			"type": "cua",
+			"options":
+			{
+				"preset": "objects/cigaretteSmoke.json"
+			}
+		},
+
+		{
+			"name": "dildo",
+			"type": "atom",
+			"options":
+			{
+				"type": "Dildo",
+				"preset": "objects/dildo.json",
+			},
+			"parameters":
+			{
+				"colliders": ["b2/2", "b3/1", "b1/1"],
+				"anchor": "pelvisF4/pelvisF4Joint",
+				"positionOffset": [0, 0.0, 0.02],
+				"rotationOffset": [0, 140, 90]
+			}
+		},
+
+		{
+			"name": "strapon",
+			"type": "clothing",
+			"options":
+			{
+				"id": "AmineKunai:Amine Belt Strapon"
+			}
+		}
+	]
+}
