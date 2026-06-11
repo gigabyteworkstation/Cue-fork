@@ -142,7 +142,11 @@ namespace Cue
 
             var rp4 = new VUI.Panel(new VUI.HorizontalFlow(8));
             rp4.Add(new VUI.Label("Sound set:"));
-            ruleSet_ = rp4.Add(new VUI.ComboBox<string>(OnRuleSet));
+            // NOTE: the index-callback-only ComboBox ctor routes through the
+            // (ItemType[], IndexCallback) overload with a null array and throws
+            // in new List<>(null); always hand it a real array.
+            ruleSet_ = rp4.Add(new VUI.ComboBox<string>(
+                SetNamesWithNone().ToArray(), OnRuleSet));
             ruleSet_.MinimumSize = new VUI.Size(250, VUI.Widget.DontCare);
             Add(rp4);
 
