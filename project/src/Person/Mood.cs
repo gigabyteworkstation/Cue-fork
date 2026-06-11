@@ -132,6 +132,7 @@ namespace Cue
 		private float timeSinceLastOrgasm_ = NoOrgasm;
 		private int orgasmChain_ = 0;
 		private const int MaxOrgasmChain = 5;
+		private float lastOrgasmIntensity_ = 0f;
 		private IEasing energyRampUpEasing_ = new LinearEasing();
 
 		private DampedFloat tiredness_ = new DampedFloat();
@@ -526,6 +527,15 @@ namespace Cue
 						{
 							float vocalDrive = brain.OrgasmVocalDrive;
 							vamVoice.DriveOrgasmIntensity(vocalDrive);
+
+							// aftershock spikes -> SexyFluids burst pulses
+							float oi = brain.OrgasmState.Intensity;
+							if (brain.OrgasmState.IsAftershock &&
+								oi > lastOrgasmIntensity_ + 0.1f)
+							{
+								person_.Foost?.SexyFluids.OnAftershock(oi);
+							}
+							lastOrgasmIntensity_ = oi;
 						}
 					}
 
@@ -561,6 +571,7 @@ namespace Cue
 						SetBaseTiredness(baseTiredness_ + ps.Get(PS.OrgasmBaseTirednessIncrease));
 
 						person_.ArousalSystem?.NotifyOrgasmEnded();
+						person_.Foost?.SexyFluids.OnOrgasmEnded();
 
 						// Authoritative end-of-orgasm: clear the VAMMoan2 orgasm
 						// latch so reactions / one-liners resume (they're gated on
@@ -756,16 +767,26 @@ namespace Cue
 			brain?.OnOrgasm();
 			orgasmChain_ = 0;
 
+			bool perpetual = (brain != null && brain.ShouldPerpetualOrgasm());
+
 			var vamVoice = person_.Voice.Provider as VamMoan2.Voice;
 			if (vamVoice != null)
 			{
 				// Sustained/perpetual loop for the multi-orgasmic types under
 				// strong continued stimulation; a normal one-shot otherwise.
-				if (brain != null && brain.ShouldPerpetualOrgasm())
+				if (perpetual)
 					vamVoice.SetPerpetualOrgasm();
 				else
 					vamVoice.SetOrgasmImmediate();
 			}
+
+			// orgasm-triggered sound rules + SexyFluids squirt (gated inside
+			// by the seeded SquirtPropensity trait)
+			float orgasmIntensity = (brain != null)
+				? brain.OrgasmTraits.OrgasmIntensityPeak : 0.8f;
+
+			person_.Sounds?.OnOrgasm(orgasmIntensity);
+			person_.Foost?.SexyFluids.OnOrgasm(perpetual);
 
 			SetState(OrgasmState);
 			timeSinceLastOrgasm_ = 0;

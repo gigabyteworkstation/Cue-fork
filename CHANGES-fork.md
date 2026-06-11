@@ -102,6 +102,50 @@ Note: the climax gate governs the brain-driven (toy/dildo) interactions the
 ArousalSystem reads; legacy zone-driven sex still reaches climax through the
 original path, so existing scenes are not regressed.
 
+## Round 3 — reactive sound system + plugin integrations
+
+A configurable, positional, intensity-driven sound event system, plus official
+integrations for Foost.SexyFluids, Foost.DildoLanguage (extended) and
+Skynet.OrificeDynamics when loaded on the Cue person atom.
+
+### Sound sets (`project/src/Sound/SoundSet.cs`)
+* Named clip banks with **3 or 5 intensity bands**; clips load from a **folder**
+  of .wav/.ogg/.mp3 or an **.assetbundle** of AudioClips (async, no hitching).
+* Band assignment by filename hint (`soft/low`, `med/mid`, `hard/high/fast`,
+  `_1.._5`) with even distribution as fallback; random in-band pick with
+  anti-repeat.
+
+### Positional playback (`project/src/Sound/SoundPlayer.cs`)
+* Pool of 16 fully-3D AudioSources placed **at the event position** (impact
+  point, orifice). Each concurrent play uses its own source, so sounds layer
+  freely; volume and pitch scale with event intensity. Zero steady-state
+  allocation.
+
+### Event detection (`project/src/Sound/SoundEvents.cs`)
+* **Impacts**: tracks configured body parts (glutes, thighs, breasts, head, …)
+  against other persons' hands/feet and the penetrator CUA; a contact-range
+  crossing with real closing speed fires a hit whose intensity follows the
+  closing speed (slap volume tracks how hard you slap).
+* **Penetration**: entry (speed-banded), exit, depth-threshold deep-thrust, and
+  **tongue/throat contact** (Mouth orifice + deep crossing) — all orifice-aware
+  via DildoLanguage's `penetration:orifice`.
+* **Fingering**: hand-to-genital proximity state machine with hysteresis;
+  entry in slow/medium/fast bands, single-band exit. Works for self and others.
+* **Rules UI** (`Sounds` person tab): per-rule trigger dropdown, body-part and
+  orifice filters, sound-set dropdown, volume/pitch/jitter, intensity→volume
+  amount, min interval, depth threshold, enable toggle. Sets and rules persist
+  with the scene.
+* Heavy resolution runs every 2 s; the per-frame path is plain vector maths on
+  pre-resolved parts.
+
+### Integrations (`project/src/Integration/FoostPlugins.cs`)
+* **SexyFluids** (same atom): orgasm fires `squirt:start`, perpetual orgasms
+  use `squirt:startEndless`/`stop`, aftershocks pulse `squirt:burst` — all
+  gated by the per-seed `SquirtPropensity` trait, so squirting is a personality
+  feature rather than universal.
+* **OrificeDynamics**: presence detection + plane params as a stretch hint.
+* **DildoLanguage**: reader now also reports the penetrated orifice.
+
 ## Files touched
 
 * `project/src/Person/Person.cs`

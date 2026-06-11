@@ -4,6 +4,11 @@ project\src\Main.cs
 project\src\Version.cs
 project\src\AI\AI.cs
 project\src\AI\ArousalNet.cs
+project\src\Sound\SoundSet.cs
+project\src\Sound\SoundPlayer.cs
+project\src\Sound\SoundEvents.cs
+project\src\Integration\FoostPlugins.cs
+project\src\UI\ScriptUI\SoundTab.cs
 project\src\AI\Events.cs
 project\src\AI\UrgeActuator.cs
 project\src\AI\Events\Grab.cs

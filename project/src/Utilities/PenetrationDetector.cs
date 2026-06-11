@@ -18,6 +18,7 @@ namespace Cue
         public bool WasActive;
         public Atom DetectedAtom;
         public string DetectedAtomName;
+        public string OrificeName;     // "Vagina" / "Anus" / "Mouth" from DildoLanguage
 
         public void Reset()
         {
@@ -31,6 +32,7 @@ namespace Cue
             SmoothedVelocity = 0f;
             DetectedAtom = null;
             DetectedAtomName = null;
+            OrificeName = null;
         }
     }
 }

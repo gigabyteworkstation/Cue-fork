@@ -340,6 +340,7 @@ namespace Cue
 			AddSubTab(new PersonDebugAnimationsTab(person_));
 			AddSubTab(new PersonDumpTab(person_));
 			AddSubTab(new ArousalSystemTab(person_));
+			AddSubTab(new SoundTab(person_));
 			for (int i = 1; i < 6; ++i)
 				SubTabs.TabsWidget.SetTabVisible(i, false);
 		}

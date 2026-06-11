@@ -20,6 +20,7 @@ namespace Cue.DildoLanguage
 		private Sys.Vam.FloatParameter   depthCm_;
 		private Sys.Vam.FloatParameter   speedCmS_;
 		private Sys.Vam.StringParameter  penetratedAtom_;
+		private Sys.Vam.StringParameter  orifice_;
 
 		private bool  available_    = false;
 		private float smoothVelRef_ = 0f;
@@ -70,6 +71,7 @@ namespace Cue.DildoLanguage
 			stats_.InsertionDepthMetres = depthM;
 			stats_.CurveParameter       = depth;
 			stats_.DetectedAtomName     = penetratedAtom_.Value;
+			stats_.OrificeName          = orifice_.Check() ? orifice_.Value : null;
 
 			stats_.SmoothedVelocity = Mathf.SmoothDamp(
 				stats_.SmoothedVelocity, rawVel, ref smoothVelRef_, SmoothTime);
@@ -111,6 +113,7 @@ namespace Cue.DildoLanguage
 			depthCm_        = new Sys.Vam.FloatParameter(  penetratorAtom_, PluginName, PenPrefix + ":depth");
 			speedCmS_       = new Sys.Vam.FloatParameter(  penetratorAtom_, PluginName, PenPrefix + ":speed");
 			penetratedAtom_ = new Sys.Vam.StringParameter( penetratorAtom_, PluginName, PenPrefix + ":atom");
+			orifice_        = new Sys.Vam.StringParameter( penetratorAtom_, PluginName, PenPrefix + ":orifice");
 
 			if (!penetrating_.Check() || !depthFactor_.Check())
 			{

@@ -352,6 +352,7 @@ namespace Cue
 				json.Add("ui", ui);
 
 			json.Add("options", options_.ToJSON());
+			json.Add("sounds", Sound.SoundManager.Instance.ToJSON());
 
 			return json;
 		}
@@ -360,6 +361,9 @@ namespace Cue
 		{
 			if (c.HasKey("options"))
 				options_.Load(c["options"].AsObject);
+
+			if (c.HasKey("sounds"))
+				Sound.SoundManager.Instance.Load(c["sounds"].AsObject);
 
 			var objects = c["objects"].AsArray;
 
@@ -500,6 +504,9 @@ namespace Cue
 				DoUpdate(s);
 			}
 			Instrumentation.End();
+
+			// drains async audio loads; no-op once sets are loaded
+			Sound.SoundManager.Instance.Update(s);
 
 
 			Instrumentation.UpdateTickers(s);
@@ -650,6 +657,7 @@ namespace Cue
 
 			Sys.OnPluginState(b);
 			ui_?.OnPluginState(b);
+			Sound.SoundManager.Instance.OnPluginState(b);
 
 			for (int i = 0; i < everythingActive_.Count; ++i)
 				everythingActive_[i].OnPluginState(b);

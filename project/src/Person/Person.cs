@@ -33,6 +33,12 @@ namespace Cue
 		private JSONClass pendingArousalState_ = null;
 		public ArousalSystem ArousalSystem { get { return arousalSystem_; } }
 
+		private Sound.SoundEventsEngine sounds_ = null;
+		private FoostIntegrations foost_ = null;
+		private JSONClass pendingSoundState_ = null;
+		public Sound.SoundEventsEngine Sounds { get { return sounds_; } }
+		public FoostIntegrations Foost { get { return foost_; } }
+
 		public Person(int objectIndex, int personIndex, Sys.IAtom atom)
 			: base(objectIndex, atom)
 		{
@@ -84,6 +90,15 @@ namespace Cue
 				pendingArousalState_ = null;
 			}
 
+			sounds_ = new Sound.SoundEventsEngine(this);
+			foost_ = new FoostIntegrations(this);
+
+			if (pendingSoundState_ != null)
+			{
+				sounds_.Load(pendingSoundState_);
+				pendingSoundState_ = null;
+			}
+
 			hasBody_ = body_.Exists;
 
 			if (IsPlayer)
@@ -118,6 +133,16 @@ namespace Cue
 			{
 				if (loadPose_)
 					personality_.Pose.Set(this);
+			}
+
+			if (r.HasKey("sounds"))
+			{
+				var so = r["sounds"].AsObject;
+
+				if (sounds_ != null)
+					sounds_.Load(so);
+				else
+					pendingSoundState_ = so;
 			}
 
 			if (r.HasKey("arousal"))
@@ -156,6 +181,9 @@ namespace Cue
 
 			if (arousalSystem_ != null)
 				o.Add("arousal", arousalSystem_.ToJSON());
+
+			if (sounds_ != null)
+				o.Add("sounds", sounds_.ToJSON());
 
 			return o;
 		}
@@ -370,6 +398,12 @@ namespace Cue
 			
 		
 			arousalSystem_.Update(s);  // reads foostInfo indirectly via adapter
+
+			if (sounds_ != null)
+				sounds_.Update(s);
+
+			if (foost_ != null)
+				foost_.Update(s);
 		}
 
 		public override void UpdatePaused(float s)
