@@ -11,7 +11,7 @@ namespace Cue
         private readonly Person person_;
 
         // sets section
-        private VUI.ComboBox<Cue.Sound.SoundSet> sets_;
+        private VUI.ComboBox<Sound.SoundSet> sets_;
         private VUI.TextBox setName_;
         private VUI.TextBox setSource_;
         private VUI.ComboBox<string> setType_;
@@ -19,7 +19,7 @@ namespace Cue
         private VUI.Label setStatus_;
 
         // rules section
-        private VUI.ComboBox<Cue.Sound.SoundRule> rules_;
+        private VUI.ComboBox<Sound.SoundRule> rules_;
         private VUI.ComboBox<string> ruleTrigger_;
         private VUI.ComboBox<string> rulePart_;
         private VUI.ComboBox<string> ruleOrifice_;
@@ -49,12 +49,12 @@ namespace Cue
 
         public override bool DebugOnly { get { return false; } }
 
-        private Cue.Sound.SoundManager Manager
+        private Sound.SoundManager Manager
         {
-            get { return Cue.Sound.SoundManager.Instance; }
+            get { return Sound.SoundManager.Instance; }
         }
 
-        private Cue.Sound.SoundEventsEngine Engine
+        private Sound.SoundEventsEngine Engine
         {
             get { return person_.Sounds; }
         }
@@ -82,7 +82,7 @@ namespace Cue
             Add(new VUI.Label("Sound sets", UnityEngine.FontStyle.Bold));
 
             var sp1 = new VUI.Panel(new VUI.HorizontalFlow(8));
-            sets_ = sp1.Add(new VUI.ComboBox<Cue.Sound.SoundSet>(OnSetSelected));
+            sets_ = sp1.Add(new VUI.ComboBox<Sound.SoundSet>(OnSetSelected));
             sets_.MinimumSize = new VUI.Size(280, VUI.Widget.DontCare);
             sp1.Add(new VUI.Button("Add set", OnAddSet));
             sp1.Add(new VUI.Button("Remove", OnRemoveSet));
@@ -119,7 +119,7 @@ namespace Cue
             Add(new VUI.Label("Trigger rules", UnityEngine.FontStyle.Bold));
 
             var rp1 = new VUI.Panel(new VUI.HorizontalFlow(8));
-            rules_ = rp1.Add(new VUI.ComboBox<Cue.Sound.SoundRule>(OnRuleSelected));
+            rules_ = rp1.Add(new VUI.ComboBox<Sound.SoundRule>(OnRuleSelected));
             rules_.MinimumSize = new VUI.Size(420, VUI.Widget.DontCare);
             rp1.Add(new VUI.Button("Add rule", OnAddRule));
             rp1.Add(new VUI.Button("Remove", OnRemoveRule));
@@ -128,7 +128,7 @@ namespace Cue
             var rp2 = new VUI.Panel(new VUI.HorizontalFlow(8));
             rp2.Add(new VUI.Label("Trigger:"));
             ruleTrigger_ = rp2.Add(new VUI.ComboBox<string>(
-                Cue.Sound.SoundRule.TriggerNames, OnRuleTrigger));
+                Sound.SoundRule.TriggerNames, OnRuleTrigger));
             ruleEnabled_ = rp2.Add(new VUI.CheckBox("Enabled", OnRuleEnabled));
             Add(rp2);
 
@@ -137,7 +137,7 @@ namespace Cue
             rulePart_ = rp3.Add(new VUI.ComboBox<string>(partNames_.ToArray(), OnRulePart));
             rp3.Add(new VUI.Label("Orifice:"));
             ruleOrifice_ = rp3.Add(new VUI.ComboBox<string>(
-                Cue.Sound.SoundRule.OrificeNames, OnRuleOrifice));
+                Sound.SoundRule.OrificeNames, OnRuleOrifice));
             Add(rp3);
 
             var rp4 = new VUI.Panel(new VUI.HorizontalFlow(8));
@@ -212,7 +212,7 @@ namespace Cue
             Cue.Instance.SaveLater();
         }
 
-        private void OnSetSelected(Cue.Sound.SoundSet s)
+        private void OnSetSelected(Sound.SoundSet s)
         {
             if (ignore_) return;
             RefreshSets();
@@ -270,7 +270,7 @@ namespace Cue
             var set = sets_.Selected;
             if (set == null) return;
 
-            if (set.SourceType == Cue.Sound.SoundSet.SourceBundle)
+            if (set.SourceType == Sound.SoundSet.SourceBundle)
             {
                 Cue.Instance.Sys.LoadFileDialog("assetbundle", (path) =>
                 {
@@ -396,7 +396,7 @@ namespace Cue
             ruleSet_.Select(idx);
         }
 
-        private void OnRuleSelected(Cue.Sound.SoundRule r)
+        private void OnRuleSelected(Sound.SoundRule r)
         {
             if (ignore_) return;
             RefreshRules();
@@ -405,7 +405,7 @@ namespace Cue
         private void OnAddRule()
         {
             if (Engine == null) return;
-            Engine.Rules.Add(new Cue.Sound.SoundRule());
+            Engine.Rules.Add(new Sound.SoundRule());
             Engine.RulesChanged();
             RefreshRules();
             rules_.Select(Engine.Rules.Count - 1);
