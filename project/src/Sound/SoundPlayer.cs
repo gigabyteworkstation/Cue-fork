@@ -49,7 +49,7 @@ namespace Cue.Sound
             }
         }
 
-        public bool Play(AudioClip clip, Vector3 pos, float volume, float pitch)
+        public bool Play(AudioClip clip, UnityEngine.Vector3 pos, float volume, float pitch)
         {
             if (clip == null || volume <= 0.001f)
                 return false;
