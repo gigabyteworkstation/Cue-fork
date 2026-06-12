@@ -336,11 +336,13 @@ namespace Cue
 			AddSubTab(new PersonAnimationsTab(person_));
 			AddSubTab(new PersonStateTab(person_));
 			AddSubTab(new PersonAITab(person_));
+			// Arousal + Sounds promoted ahead of the body/debug tabs so they
+			// stay visible in the tab strip instead of being cut off at the end.
+			AddSubTab(new ArousalSystemTab(person_));
+			AddSubTab(new SoundTab(person_));
 			AddSubTab(new PersonBodyTab(person_));
 			AddSubTab(new PersonDebugAnimationsTab(person_));
 			AddSubTab(new PersonDumpTab(person_));
-			AddSubTab(new ArousalSystemTab(person_));
-			AddSubTab(new SoundTab(person_));
 			for (int i = 1; i < 6; ++i)
 				SubTabs.TabsWidget.SetTabVisible(i, false);
 		}

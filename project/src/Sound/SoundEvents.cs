@@ -44,9 +44,22 @@ namespace Cue.Sound
         public float pitch = 1.0f;
         public float pitchJitter = 0.05f;
         public float intensityToVolume = 1.0f;   // 0 = constant volume, 1 = fully attenuated
+        public float velToPitch = 0.0f;          // 0 = constant pitch, 1 = hard hits ring up to +0.5
         public float minInterval = 0.15f;
         public float depthThreshold = 0.8f;      // DeepThrust / Tongue
+        public float minSpeed = 0.4f;            // m/s -> intensity 0 (impact / fingering)
+        public float maxSpeed = 2.8f;            // m/s -> intensity 1 (impact / fingering)
         public bool enabled = true;
+
+        // Maps a raw closing/approach speed (m/s) to a 0..1 intensity using this
+        // rule's min/max speed window. Used by the impact and fingering
+        // detectors so each rule can have its own sensitivity.
+        public float SpeedToIntensity(float speed)
+        {
+            float span = maxSpeed - minSpeed;
+            if (span < 0.01f) span = 0.01f;
+            return Mathf.Clamp01((speed - minSpeed) / span);
+        }
 
         // runtime
         public float lastFire = -1000f;
@@ -78,8 +91,11 @@ namespace Cue.Sound
             o.Add("pitch",    new JSONData(pitch));
             o.Add("jitter",   new JSONData(pitchJitter));
             o.Add("intVol",   new JSONData(intensityToVolume));
+            o.Add("velPitch", new JSONData(velToPitch));
             o.Add("interval", new JSONData(minInterval));
             o.Add("depth",    new JSONData(depthThreshold));
+            o.Add("minSpeed", new JSONData(minSpeed));
+            o.Add("maxSpeed", new JSONData(maxSpeed));
             o.Add("enabled",  new JSONData(enabled));
             return o;
         }
@@ -101,8 +117,11 @@ namespace Cue.Sound
             J.OptFloat(o, "pitch",    ref r.pitch);
             J.OptFloat(o, "jitter",   ref r.pitchJitter);
             J.OptFloat(o, "intVol",   ref r.intensityToVolume);
+            J.OptFloat(o, "velPitch", ref r.velToPitch);
             J.OptFloat(o, "interval", ref r.minInterval);
             J.OptFloat(o, "depth",    ref r.depthThreshold);
+            J.OptFloat(o, "minSpeed", ref r.minSpeed);
+            J.OptFloat(o, "maxSpeed", ref r.maxSpeed);
             bool e = true;
             J.OptBool(o,  "enabled",  ref e);
             r.enabled = e;
@@ -137,9 +156,8 @@ namespace Cue.Sound
     {
         private const float RebuildInterval   = 2.0f;
         private const float ImpactRadius      = 0.13f;
-        private const float ImpactMinSpeed    = 0.45f;   // m/s closing speed to count as a hit
-        private const float ImpactMaxSpeed    = 2.8f;    // maps to intensity 1
-        private const float ImpactCooldown    = 0.20f;
+        private const float ImpactMinSpeed    = 0.15f;   // global gate; per-rule minSpeed filters further
+        private const float ImpactCooldown    = 0.18f;
         private const float FingerEnterDist   = 0.055f;
         private const float FingerExitDist    = 0.095f;
 
@@ -175,6 +193,7 @@ namespace Cue.Sound
         private BodyPart[] hands_ = new BodyPart[0];
         private bool[] handInside_ = new bool[0];
         private float[] handDist_ = new float[0];
+        private UnityEngine.Vector3[] handLastPos_ = new UnityEngine.Vector3[0];
         private BodyPart vagina_ = null;
         private BodyPart lips_ = null;
 
@@ -224,6 +243,8 @@ namespace Cue.Sound
 
             var fingerIn = new SoundRule();
             fingerIn.trigger = SoundRule.TriggerFingerEntry;
+            fingerIn.minSpeed = 0.05f;   // fingers move much slower than slaps
+            fingerIn.maxSpeed = 1.2f;
             rules_.Add(fingerIn);
 
             var fingerOut = new SoundRule();
@@ -342,8 +363,12 @@ namespace Cue.Sound
             {
                 handInside_ = new bool[hs.Count];
                 handDist_ = new float[hs.Count];
+                handLastPos_ = new UnityEngine.Vector3[hs.Count];
                 for (int i = 0; i < hs.Count; ++i)
+                {
                     handDist_[i] = 10f;
+                    handLastPos_[i] = Sys.Vam.U.ToUnity(hs[i].Position);
+                }
             }
             hands_ = hs.ToArray();
 
@@ -400,19 +425,23 @@ namespace Cue.Sound
                         continue;
                     }
 
-                    // crossing into contact range with real closing speed
-                    if (dist < ImpactRadius && last >= ImpactRadius && s > 0f)
-                    {
-                        float closing = (last - dist) / s;
-                        if (closing >= ImpactMinSpeed)
-                        {
-                            float intensity = Mathf.Clamp01(
-                                (closing - ImpactMinSpeed) / (ImpactMaxSpeed - ImpactMinSpeed));
+                    if (s <= 0f)
+                        continue;
 
-                            var mid = (tp + pp) * 0.5f;
-                            FireImpact(targetTypes_[t], mid, intensity);
-                            pairCooldown_[idx] = ImpactCooldown;
-                        }
+                    float closing = (last - dist) / s;   // m/s, positive = approaching
+
+                    // Fire on a clean crossing into the contact shell, or when a
+                    // fast move tunnelled straight to deep inside it in one frame
+                    // (anti-tunnel). Per-rule minSpeed decides what's loud enough.
+                    bool crossedIn = (dist < ImpactRadius && last >= ImpactRadius);
+                    bool tunnelled = (dist < ImpactRadius * 0.6f && closing > 0f &&
+                                      last >= ImpactRadius * 0.6f);
+
+                    if ((crossedIn || tunnelled) && closing >= ImpactMinSpeed)
+                    {
+                        var mid = (tp + pp) * 0.5f;
+                        FireImpact(targetTypes_[t], mid, closing);  // pass raw m/s
+                        pairCooldown_[idx] = ImpactCooldown;
                     }
                 }
             }
@@ -497,28 +526,61 @@ namespace Cue.Sound
             for (int i = 0; i < hands_.Length && i < handInside_.Length; ++i)
             {
                 var hp = Sys.Vam.U.ToUnity(hands_[i].Position);
+                var move = hp - handLastPos_[i];
+                handLastPos_[i] = hp;
+
                 float dist = UnityEngine.Vector3.Distance(vp, hp);
-                float last = handDist_[i];
                 handDist_[i] = dist;
 
-                if (!handInside_[i] && dist < FingerEnterDist && last >= FingerEnterDist)
+                float moveLen = move.magnitude;
+                float speed = moveLen / s;
+
+                // "Actually going in": the hand must be close AND moving toward
+                // the orifice along its approach (not just sliding past nearby).
+                // This is a far better proxy than raw distance and is robust to
+                // the orifice control's rotation convention.
+                bool movingIn = false;
+                if (moveLen > 1e-4f)
+                {
+                    var toOrifice = vp - hp;
+                    if (toOrifice.sqrMagnitude > 1e-6f)
+                        movingIn = UnityEngine.Vector3.Dot(
+                            move / moveLen, toOrifice.normalized) > 0.5f;
+                }
+
+                if (!handInside_[i] && dist < FingerEnterDist && movingIn)
                 {
                     handInside_[i] = true;
-
-                    // approach speed -> slow/medium/fast bands
-                    float speed = (last - dist) / s;
-                    float intensity;
-                    if (speed < 0.25f)      intensity = 0.15f;
-                    else if (speed < 0.7f)  intensity = 0.5f;
-                    else                    intensity = 0.85f;
-
-                    Fire(SoundRule.TriggerFingerEntry, "Vagina", vp, intensity, now);
+                    // entry: hand speed -> per-rule intensity bands
+                    FireMapped(SoundRule.TriggerFingerEntry, "Vagina", vp, speed, now);
                 }
                 else if (handInside_[i] && dist > FingerExitDist)
                 {
                     handInside_[i] = false;
-                    Fire(SoundRule.TriggerFingerExit, "Vagina", vp, 0.5f, now);
+                    // exit: single fixed intensity
+                    Fire(SoundRule.TriggerFingerExit, "Vagina", vp, 0.4f, now);
                 }
+            }
+        }
+
+        // Like Fire(), but maps a raw approach speed (m/s) to each matching
+        // rule's own intensity window (used for fingering entry, where the user
+        // wants graded intensities driven by how fast the finger goes in).
+        private void FireMapped(
+            int trigger, string orifice, UnityEngine.Vector3 pos,
+            float rawSpeed, float now)
+        {
+            for (int i = 0; i < rules_.Count; ++i)
+            {
+                var r = rules_[i];
+                if (!r.enabled || r.trigger != trigger)
+                    continue;
+                if (orifice != null && !r.MatchesOrifice(orifice))
+                    continue;
+                if (rawSpeed < r.minSpeed)
+                    continue;
+
+                FireRule(r, pos, r.SpeedToIntensity(rawSpeed), now);
             }
         }
 
@@ -535,7 +597,7 @@ namespace Cue.Sound
                 Cue.Instance.Sys.RealtimeSinceStartup);
         }
 
-        private void FireImpact(BodyPartType part, UnityEngine.Vector3 pos, float intensity)
+        private void FireImpact(BodyPartType part, UnityEngine.Vector3 pos, float rawSpeed)
         {
             float now = Cue.Instance.Sys.RealtimeSinceStartup;
 
@@ -546,7 +608,10 @@ namespace Cue.Sound
                     continue;
                 if (r.part != BP.None && r.part != part)
                     continue;
+                if (rawSpeed < r.minSpeed)
+                    continue;
 
+                float intensity = r.SpeedToIntensity(rawSpeed);
                 if (FireRule(r, pos, intensity, now))
                     ++impactsFired_;
             }
@@ -579,7 +644,7 @@ namespace Cue.Sound
 
             bool ok = SoundManager.Instance.Play(
                 r.set, pos, intensity,
-                r.volume, r.pitch, r.pitchJitter, r.intensityToVolume);
+                r.volume, r.pitch, r.pitchJitter, r.intensityToVolume, r.velToPitch);
 
             if (ok)
                 ++eventsFired_;

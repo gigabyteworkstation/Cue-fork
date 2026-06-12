@@ -23,7 +23,12 @@ namespace Cue.Sound
         private string name_;
         private string source_ = "";
         private int    sourceType_ = SourceFolder;
-        private int    bandCount_ = 3;
+
+        // User-defined intensity bands. Empty == no intensity grouping: every
+        // clip goes into one pool and Pick() returns a random clip regardless
+        // of intensity. Otherwise the count is the number of bands and the
+        // names are matched against filenames to assign clips.
+        private List<string> intensityNames_ = new List<string>() { "soft", "medium", "hard" };
 
         private List<AudioClip>[] bands_ = null;
         private List<NamedAudioClip> pending_ = null;  // folder clips still streaming in
@@ -44,10 +49,42 @@ namespace Cue.Sound
         public int    SourceType { get { return sourceType_; } set { sourceType_ = value; } }
         public string LoadError  { get { return loadError_; } }
 
+        // Number of clip pools: one per intensity name, or a single pool when no
+        // intensities are configured.
         public int BandCount
         {
-            get { return bandCount_; }
-            set { bandCount_ = (value == 5) ? 5 : 3; AllocBands(); }
+            get { return Mathf.Max(1, intensityNames_.Count); }
+        }
+
+        public bool HasIntensities
+        {
+            get { return intensityNames_.Count > 0; }
+        }
+
+        public List<string> IntensityNames
+        {
+            get { return intensityNames_; }
+        }
+
+        // Comma-separated for the UI: "soft, medium, hard" (blank == none).
+        public string IntensityCSV
+        {
+            get { return string.Join(", ", intensityNames_.ToArray()); }
+            set
+            {
+                intensityNames_ = new List<string>();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    var parts = value.Split(',');
+                    for (int i = 0; i < parts.Length; ++i)
+                    {
+                        var t = parts[i].Trim();
+                        if (t.Length > 0)
+                            intensityNames_.Add(t);
+                    }
+                }
+                AllocBands();
+            }
         }
 
         public int TotalClips
@@ -85,8 +122,9 @@ namespace Cue.Sound
 
         private void AllocBands()
         {
-            bands_ = new List<AudioClip>[bandCount_];
-            for (int i = 0; i < bandCount_; ++i)
+            int n = BandCount;
+            bands_ = new List<AudioClip>[n];
+            for (int i = 0; i < n; ++i)
                 bands_[i] = new List<AudioClip>();
         }
 
@@ -95,16 +133,20 @@ namespace Cue.Sound
         // neighbouring bands when the target band is empty.
         public AudioClip Pick(float intensity)
         {
-            if (bands_ == null) return null;
+            if (bands_ == null || bands_.Length == 0) return null;
 
-            int band = Mathf.Clamp(
-                (int)(Mathf.Clamp01(intensity) * bandCount_), 0, bandCount_ - 1);
+            int n = bands_.Length;
 
-            for (int tries = 0; tries < bandCount_; ++tries)
+            // Single pool (no intensities configured): pure random.
+            int band = (n == 1)
+                ? 0
+                : Mathf.Clamp((int)(Mathf.Clamp01(intensity) * n), 0, n - 1);
+
+            for (int tries = 0; tries < n; ++tries)
             {
                 int b = band - tries;
                 if (b < 0) b = band + tries;
-                if (b < 0 || b >= bandCount_ || bands_[b].Count == 0)
+                if (b < 0 || b >= n || bands_[b].Count == 0)
                     continue;
 
                 var list = bands_[b];
@@ -277,31 +319,42 @@ namespace Cue.Sound
 
         private void AddClip(AudioClip clip, string name, int orderIndex, int orderTotal)
         {
+            int nb = BandCount;
+
+            // No intensities -> single pool, everything in band 0.
+            if (intensityNames_.Count == 0)
+            {
+                bands_[0].Add(clip);
+                return;
+            }
+
             int band = GuessBand(name);
 
             if (band < 0)
             {
                 // no hint: distribute evenly in sorted order
                 if (orderTotal <= 0) orderTotal = 1;
-                band = Mathf.Clamp(
-                    orderIndex * bandCount_ / orderTotal, 0, bandCount_ - 1);
+                band = Mathf.Clamp(orderIndex * nb / orderTotal, 0, nb - 1);
             }
 
             bands_[band].Add(clip);
         }
 
+        // Matches a filename against the configured intensity names (substring,
+        // case-insensitive), then against _1.._N / -1..-N numeric suffixes.
+        // Returns -1 when nothing matches so the caller can distribute evenly.
         private int GuessBand(string name)
         {
             string n = name.ToLowerInvariant();
 
-            if (n.Contains("soft") || n.Contains("low") || n.Contains("slow"))
-                return 0;
-            if (n.Contains("med") || n.Contains("mid"))
-                return bandCount_ / 2;
-            if (n.Contains("hard") || n.Contains("high") || n.Contains("fast"))
-                return bandCount_ - 1;
+            for (int i = 0; i < intensityNames_.Count; ++i)
+            {
+                string key = intensityNames_[i].ToLowerInvariant().Trim();
+                if (key.Length > 0 && n.Contains(key))
+                    return i;
+            }
 
-            for (int b = bandCount_; b >= 1; --b)
+            for (int b = intensityNames_.Count; b >= 1; --b)
             {
                 if (n.Contains("_" + b) || n.Contains("-" + b))
                     return b - 1;
@@ -327,7 +380,12 @@ namespace Cue.Sound
             o.Add("name",       name_);
             o.Add("source",     source_);
             o.Add("sourceType", new JSONData(sourceType_));
-            o.Add("bands",      new JSONData(bandCount_));
+
+            var arr = new JSONArray();
+            for (int i = 0; i < intensityNames_.Count; ++i)
+                arr.Add(new JSONData(intensityNames_[i]));
+            o.Add("intensities", arr);
+
             return o;
         }
 
@@ -341,9 +399,29 @@ namespace Cue.Sound
             int st = SourceFolder;
             J.OptInt(o, "sourceType", ref st);
             s.sourceType_ = st;
-            int b = 3;
-            J.OptInt(o, "bands", ref b);
-            s.BandCount = b;
+
+            if (o.HasKey("intensities"))
+            {
+                var names = new List<string>();
+                var arr = o["intensities"].AsArray;
+                if (arr != null)
+                {
+                    foreach (JSONNode n in arr)
+                        names.Add(n.Value);
+                }
+                s.intensityNames_ = names;
+                s.AllocBands();
+            }
+            else if (o.HasKey("bands"))
+            {
+                // back-compat: old 3/5 numeric band count
+                int b = 3;
+                J.OptInt(o, "bands", ref b);
+                s.IntensityCSV = (b == 5)
+                    ? "soft, light, medium, hard, intense"
+                    : "soft, medium, hard";
+            }
+
             s.Reload();
             return s;
         }
@@ -419,7 +497,7 @@ namespace Cue.Sound
         public bool Play(
             string setName, UnityEngine.Vector3 pos, float intensity,
             float volumeScale, float pitchBase, float pitchJitter,
-            float intensityToVolume)
+            float intensityToVolume, float velToPitch)
         {
             var set = Find(setName);
             if (set == null) return false;
@@ -432,7 +510,7 @@ namespace Cue.Sound
 
             float pitch = pitchBase
                 + (UnityEngine.Random.value * 2f - 1f) * pitchJitter
-                + Mathf.Clamp01(intensity) * 0.06f;  // harder hits ring slightly higher
+                + Mathf.Clamp01(intensity) * velToPitch * 0.5f;  // velocity raises pitch
 
             return player_.Play(clip, pos, Mathf.Clamp(vol, 0f, 2f), pitch);
         }

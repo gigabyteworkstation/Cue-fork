@@ -15,7 +15,7 @@ namespace Cue
         private VUI.TextBox setName_;
         private VUI.TextBox setSource_;
         private VUI.ComboBox<string> setType_;
-        private VUI.ComboBox<string> setBands_;
+        private VUI.TextBox setIntensity_;
         private VUI.Label setStatus_;
 
         // rules section
@@ -28,8 +28,11 @@ namespace Cue
         private VUI.FloatTextSlider rulePitch_;
         private VUI.FloatTextSlider ruleJitter_;
         private VUI.FloatTextSlider ruleIntVol_;
+        private VUI.FloatTextSlider ruleVelPitch_;
         private VUI.FloatTextSlider ruleInterval_;
         private VUI.FloatTextSlider ruleDepth_;
+        private VUI.FloatTextSlider ruleMinSpeed_;
+        private VUI.FloatTextSlider ruleMaxSpeed_;
         private VUI.CheckBox ruleEnabled_;
 
         private VUI.FloatTextSlider masterVolume_;
@@ -91,10 +94,14 @@ namespace Cue
             var sp2 = new VUI.Panel(new VUI.HorizontalFlow(8));
             sp2.Add(new VUI.Label("Name:"));
             setName_ = sp2.Add(new VUI.TextBox("", "set name", OnSetName));
-            sp2.Add(new VUI.Label("Bands:"));
-            setBands_ = sp2.Add(new VUI.ComboBox<string>(
-                new string[] { "3", "5" }, OnSetBands));
             Add(sp2);
+
+            var sp2b = new VUI.Panel(new VUI.HorizontalFlow(8));
+            sp2b.Add(new VUI.Label("Intensities:"));
+            setIntensity_ = sp2b.Add(new VUI.TextBox(
+                "", "blank = none (random); e.g.  soft, medium, hard", OnSetIntensity));
+            setIntensity_.MinimumSize = new VUI.Size(360, VUI.Widget.DontCare);
+            Add(sp2b);
 
             var sp3 = new VUI.Panel(new VUI.HorizontalFlow(8));
             sp3.Add(new VUI.Label("Source:"));
@@ -102,6 +109,9 @@ namespace Cue
             setSource_.MinimumSize = new VUI.Size(330, VUI.Widget.DontCare);
             setType_ = sp3.Add(new VUI.ComboBox<string>(
                 new string[] { "Folder", "AssetBundle" }, OnSetType));
+            // Without an explicit minimum the closed combobox can collapse to
+            // nothing once a value is picked.
+            setType_.MinimumSize = new VUI.Size(150, VUI.Widget.DontCare);
             sp3.Add(new VUI.Button("Browse...", OnBrowse));
             Add(sp3);
 
@@ -129,15 +139,18 @@ namespace Cue
             rp2.Add(new VUI.Label("Trigger:"));
             ruleTrigger_ = rp2.Add(new VUI.ComboBox<string>(
                 Sound.SoundRule.TriggerNames, OnRuleTrigger));
+            ruleTrigger_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
             ruleEnabled_ = rp2.Add(new VUI.CheckBox("Enabled", OnRuleEnabled));
             Add(rp2);
 
             var rp3 = new VUI.Panel(new VUI.HorizontalFlow(8));
             rp3.Add(new VUI.Label("Body part:"));
             rulePart_ = rp3.Add(new VUI.ComboBox<string>(partNames_.ToArray(), OnRulePart));
+            rulePart_.MinimumSize = new VUI.Size(170, VUI.Widget.DontCare);
             rp3.Add(new VUI.Label("Orifice:"));
             ruleOrifice_ = rp3.Add(new VUI.ComboBox<string>(
                 Sound.SoundRule.OrificeNames, OnRuleOrifice));
+            ruleOrifice_.MinimumSize = new VUI.Size(140, VUI.Widget.DontCare);
             Add(rp3);
 
             var rp4 = new VUI.Panel(new VUI.HorizontalFlow(8));
@@ -161,11 +174,19 @@ namespace Cue
 
             grid.Add(new VUI.Label("Pitch jitter:"));
             ruleJitter_ = grid.Add(new VUI.FloatTextSlider(0.05f, 0f, 0.5f, OnRuleJitter));
-            grid.Add(new VUI.Label("Intensity→vol:"));
+            grid.Add(new VUI.Label("Vel→volume:"));
             ruleIntVol_ = grid.Add(new VUI.FloatTextSlider(1f, 0f, 1f, OnRuleIntVol));
 
+            grid.Add(new VUI.Label("Vel→pitch:"));
+            ruleVelPitch_ = grid.Add(new VUI.FloatTextSlider(0f, 0f, 1f, OnRuleVelPitch));
             grid.Add(new VUI.Label("Min interval:"));
             ruleInterval_ = grid.Add(new VUI.FloatTextSlider(0.15f, 0f, 5f, OnRuleInterval));
+
+            grid.Add(new VUI.Label("Min speed (m/s):"));
+            ruleMinSpeed_ = grid.Add(new VUI.FloatTextSlider(0.4f, 0f, 5f, OnRuleMinSpeed));
+            grid.Add(new VUI.Label("Max speed (m/s):"));
+            ruleMaxSpeed_ = grid.Add(new VUI.FloatTextSlider(2.8f, 0.1f, 8f, OnRuleMaxSpeed));
+
             grid.Add(new VUI.Label("Depth thresh:"));
             ruleDepth_ = grid.Add(new VUI.FloatTextSlider(0.8f, 0.1f, 1f, OnRuleDepth));
 
@@ -174,12 +195,22 @@ namespace Cue
 
         // ---- sets handlers ----------------------------------------------
 
-        private void RefreshSets()
+        // Rebuilds the dropdown item lists. MUST NOT be called from the set
+        // selection handler: SetItems resets the selection to index 0, which is
+        // exactly what made the dropdown snap back to set1.
+        private void RebuildSetList()
         {
             ignore_ = true;
-
             sets_.SetItems(Manager.Sets);
             ruleSet_.SetItems(SetNamesWithNone());
+            ignore_ = false;
+        }
+
+        // Mirrors the currently-selected set into the editor fields. Safe to
+        // call on selection change because it never touches the item list.
+        private void ShowSelectedSet()
+        {
+            ignore_ = true;
 
             var s = sets_.Selected;
             if (s != null)
@@ -187,17 +218,24 @@ namespace Cue
                 setName_.Text = s.Name;
                 setSource_.Text = s.Source;
                 setType_.Select(s.SourceType);
-                setBands_.Select(s.BandCount == 5 ? 1 : 0);
+                setIntensity_.Text = s.IntensityCSV;
                 setStatus_.Text = s.Status;
             }
             else
             {
                 setName_.Text = "";
                 setSource_.Text = "";
+                setIntensity_.Text = "";
                 setStatus_.Text = "";
             }
 
             ignore_ = false;
+        }
+
+        private void RefreshSets()
+        {
+            RebuildSetList();
+            ShowSelectedSet();
         }
 
         private List<string> SetNamesWithNone()
@@ -219,15 +257,16 @@ namespace Cue
         private void OnSetSelected(Sound.SoundSet s)
         {
             if (ignore_) return;
-            RefreshSets();
+            ShowSelectedSet();
         }
 
         private void OnAddSet()
         {
             if (ignore_) return;
             var s = Manager.Add("set" + (Manager.Sets.Count + 1));
-            RefreshSets();
+            RebuildSetList();
             sets_.Select(Manager.Sets.IndexOf(s));
+            ShowSelectedSet();
             Cue.Instance.SaveLater();
         }
 
@@ -235,15 +274,24 @@ namespace Cue
         {
             if (ignore_) return;
             Manager.Remove(sets_.Selected);
-            RefreshSets();
+            RebuildSetList();
+            ShowSelectedSet();
             Cue.Instance.SaveLater();
         }
 
         private void OnSetName(string s)
         {
             if (ignore_ || sets_.Selected == null) return;
-            sets_.Selected.Name = s;
-            RefreshSets();
+            var cur = sets_.Selected;
+            cur.Name = s;
+
+            int idx = Manager.Sets.IndexOf(cur);
+            ignore_ = true;
+            sets_.SetItems(Manager.Sets);
+            ruleSet_.SetItems(SetNamesWithNone());
+            if (idx >= 0) sets_.Select(idx);   // keep it selected, no re-entry
+            ignore_ = false;
+
             Cue.Instance.SaveLater();
         }
 
@@ -261,11 +309,12 @@ namespace Cue
             Cue.Instance.SaveLater();
         }
 
-        private void OnSetBands(int i)
+        private void OnSetIntensity(string s)
         {
             if (ignore_ || sets_.Selected == null) return;
-            sets_.Selected.BandCount = (i == 1) ? 5 : 3;
+            sets_.Selected.IntensityCSV = s;
             sets_.Selected.Reload();
+            setStatus_.Text = sets_.Selected.Status;
             Cue.Instance.SaveLater();
         }
 
@@ -281,7 +330,7 @@ namespace Cue
                     if (string.IsNullOrEmpty(path)) return;
                     set.Source = path;
                     set.Reload();
-                    RefreshSets();
+                    ShowSelectedSet();
                     Cue.Instance.SaveLater();
                 });
             }
@@ -299,7 +348,7 @@ namespace Cue
 
                     set.Source = path;
                     set.Reload();
-                    RefreshSets();
+                    ShowSelectedSet();
                     Cue.Instance.SaveLater();
                 });
             }
@@ -309,7 +358,7 @@ namespace Cue
         {
             if (sets_.Selected == null) return;
             sets_.Selected.Reload();
-            RefreshSets();
+            ShowSelectedSet();
         }
 
         private void OnTest(float intensity)
@@ -322,18 +371,24 @@ namespace Cue
                 ? Sys.Vam.U.ToUnity(head.Position)
                 : Sys.Vam.U.ToUnity(person_.Position);
 
-            Manager.Play(set.Name, pos, intensity, 1f, 1f, 0.05f, 1f);
+            Manager.Play(set.Name, pos, intensity, 1f, 1f, 0.05f, 1f, 0f);
         }
 
         // ---- rules handlers ----------------------------------------------
 
-        private void RefreshRules()
+        private void RebuildRuleList()
         {
             if (Engine == null) return;
-
             ignore_ = true;
-
             rules_.SetItems(Engine.Rules);
+            ignore_ = false;
+        }
+
+        // Mirrors the selected rule into the editor controls; never rebuilds the
+        // rule list (that would reset the selection back to rule 0).
+        private void ShowSelectedRule()
+        {
+            ignore_ = true;
 
             var r = rules_.Selected;
             if (r != null)
@@ -346,12 +401,21 @@ namespace Cue
                 rulePitch_.Value = r.pitch;
                 ruleJitter_.Value = r.pitchJitter;
                 ruleIntVol_.Value = r.intensityToVolume;
+                ruleVelPitch_.Value = r.velToPitch;
                 ruleInterval_.Value = r.minInterval;
                 ruleDepth_.Value = r.depthThreshold;
+                ruleMinSpeed_.Value = r.minSpeed;
+                ruleMaxSpeed_.Value = r.maxSpeed;
                 ruleEnabled_.Checked = r.enabled;
             }
 
             ignore_ = false;
+        }
+
+        private void RefreshRules()
+        {
+            RebuildRuleList();
+            ShowSelectedRule();
         }
 
         private int PartToIndex(BodyPartType part)
@@ -403,7 +467,7 @@ namespace Cue
         private void OnRuleSelected(Sound.SoundRule r)
         {
             if (ignore_) return;
-            RefreshRules();
+            ShowSelectedRule();
         }
 
         private void OnAddRule()
@@ -411,8 +475,9 @@ namespace Cue
             if (Engine == null) return;
             Engine.Rules.Add(new Sound.SoundRule());
             Engine.RulesChanged();
-            RefreshRules();
+            RebuildRuleList();
             rules_.Select(Engine.Rules.Count - 1);
+            ShowSelectedRule();
             Cue.Instance.SaveLater();
         }
 
@@ -421,7 +486,8 @@ namespace Cue
             if (Engine == null || rules_.Selected == null) return;
             Engine.Rules.Remove(rules_.Selected);
             Engine.RulesChanged();
-            RefreshRules();
+            RebuildRuleList();
+            ShowSelectedRule();
             Cue.Instance.SaveLater();
         }
 
@@ -437,6 +503,7 @@ namespace Cue
             if (ignore_ || rules_.Selected == null) return;
             rules_.Selected.trigger = i;
             ChangedRule();
+            RelabelRules();
         }
 
         private void OnRulePart(int i)
@@ -444,6 +511,7 @@ namespace Cue
             if (ignore_ || rules_.Selected == null) return;
             rules_.Selected.part = IndexToPart(i);
             ChangedRule();
+            RelabelRules();
         }
 
         private void OnRuleOrifice(int i)
@@ -451,6 +519,7 @@ namespace Cue
             if (ignore_ || rules_.Selected == null) return;
             rules_.Selected.orifice = i;
             ChangedRule();
+            RelabelRules();
         }
 
         private void OnRuleSet(int i)
@@ -458,6 +527,7 @@ namespace Cue
             if (ignore_ || rules_.Selected == null) return;
             rules_.Selected.set = (i <= 0) ? "" : Manager.Sets[i - 1].Name;
             ChangedRule();
+            RelabelRules();
         }
 
         private void OnRuleVolume(float f)
@@ -486,6 +556,43 @@ namespace Cue
             if (ignore_ || rules_.Selected == null) return;
             rules_.Selected.intensityToVolume = f;
             ChangedRule();
+        }
+
+        private void OnRuleVelPitch(float f)
+        {
+            if (ignore_ || rules_.Selected == null) return;
+            rules_.Selected.velToPitch = f;
+            ChangedRule();
+        }
+
+        private void OnRuleMinSpeed(float f)
+        {
+            if (ignore_ || rules_.Selected == null) return;
+            rules_.Selected.minSpeed = f;
+            ChangedRule();
+        }
+
+        private void OnRuleMaxSpeed(float f)
+        {
+            if (ignore_ || rules_.Selected == null) return;
+            rules_.Selected.maxSpeed = f;
+            ChangedRule();
+        }
+
+        // Re-labels the rule dropdown after a change that alters a rule's
+        // ToString (trigger/part/orifice/set), keeping the same rule selected.
+        // Fully ignore_-guarded so the rebuild can't re-enter the editor through
+        // the selection callback (the controls already hold the new values).
+        private void RelabelRules()
+        {
+            if (Engine == null || rules_.Selected == null) return;
+
+            int idx = Engine.Rules.IndexOf(rules_.Selected);
+
+            ignore_ = true;
+            rules_.SetItems(Engine.Rules);
+            if (idx >= 0) rules_.Select(idx);
+            ignore_ = false;
         }
 
         private void OnRuleInterval(float f)
