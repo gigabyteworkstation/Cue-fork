@@ -17,13 +17,16 @@ namespace Cue.Sound
         public const int TriggerFingerEntry  = 5;
         public const int TriggerFingerExit   = 6;
         public const int TriggerOrgasm       = 7;
-        public const int TriggerCount        = 8;
+        public const int TriggerThrustIn     = 8;   // continuous, while sliding inward
+        public const int TriggerThrustOut    = 9;   // continuous, while sliding outward
+        public const int TriggerCount        = 10;
 
         public static readonly string[] TriggerNames = new string[]
         {
             "Impact on body part", "Penetration entry", "Penetration exit",
             "Deep thrust", "Tongue/throat contact", "Fingering entry",
-            "Fingering exit", "Orgasm start"
+            "Fingering exit", "Orgasm start",
+            "Thrusting IN (wet loop)", "Thrusting OUT (wet loop)"
         };
 
         public const int OrificeAny    = 0;
@@ -134,7 +137,7 @@ namespace Cue.Sound
 
             if (trigger == TriggerImpact && part != BP.None)
                 s += " (" + BodyPartType.ToString(part) + ")";
-            else if (trigger >= TriggerPenEntry && trigger <= TriggerDeepThrust && orifice != OrificeAny)
+            else if (trigger != TriggerImpact && trigger != TriggerOrgasm && orifice != OrificeAny)
                 s += " (" + OrificeNames[orifice] + ")";
 
             s += " -> " + (string.IsNullOrEmpty(set) ? "(no set)" : set);
@@ -160,6 +163,7 @@ namespace Cue.Sound
         private const float ImpactCooldown    = 0.18f;
         private const float FingerEnterDist   = 0.055f;
         private const float FingerExitDist    = 0.095f;
+        private const float ThrustMoveSpeed   = 0.03f;   // m/s; min motion to count as sliding
 
         // body parts that can be impact targets
         private static readonly BodyPartType[] TargetParts = new BodyPartType[]
@@ -240,6 +244,18 @@ namespace Cue.Sound
             deep.trigger = SoundRule.TriggerDeepThrust;
             deep.minInterval = 0.25f;
             rules_.Add(deep);
+
+            var thrustIn = new SoundRule();
+            thrustIn.trigger = SoundRule.TriggerThrustIn;
+            thrustIn.minInterval = 0.10f;   // dense stream of wet sounds
+            thrustIn.velToPitch = 0.3f;
+            rules_.Add(thrustIn);
+
+            var thrustOut = new SoundRule();
+            thrustOut.trigger = SoundRule.TriggerThrustOut;
+            thrustOut.minInterval = 0.10f;
+            thrustOut.velToPitch = 0.3f;
+            rules_.Add(thrustOut);
 
             var fingerIn = new SoundRule();
             fingerIn.trigger = SoundRule.TriggerFingerEntry;
@@ -504,6 +520,21 @@ namespace Cue.Sound
                         }
                     }
                 }
+
+                // Continuous wet sliding: while the penetrator is moving, fire
+                // the matching directional rule. SmoothedVelocity > 0 is inward,
+                // < 0 is outward, so IN and OUT can drive dedicated sounds. The
+                // per-rule minInterval throttles it into a steady stream of
+                // randomised wet one-shots (set a small interval for a "loop"),
+                // and the speed becomes the intensity so volume/pitch track the
+                // thrust velocity.
+                float v   = pen.SmoothedVelocity;
+                float spd = Mathf.Clamp01(pen.NormalisedSpeed);
+
+                if (v > ThrustMoveSpeed)
+                    Fire(SoundRule.TriggerThrustIn, orifice, pos, spd, now);
+                else if (v < -ThrustMoveSpeed)
+                    Fire(SoundRule.TriggerThrustOut, orifice, pos, spd, now);
 
                 lastPenDepth_ = pen.NormalisedDepth;
             }

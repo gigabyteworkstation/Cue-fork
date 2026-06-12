@@ -37,6 +37,9 @@ namespace Cue
 
         private VUI.FloatTextSlider masterVolume_;
 
+        private VUI.Button[] testBtns_ = new VUI.Button[8];
+        private float[] testInt_ = new float[8];
+
         private List<string> partNames_ = new List<string>();
         private bool ignore_ = false;
 
@@ -106,7 +109,11 @@ namespace Cue
             var sp3 = new VUI.Panel(new VUI.HorizontalFlow(8));
             sp3.Add(new VUI.Label("Source:"));
             setSource_ = sp3.Add(new VUI.TextBox("", "folder or .assetbundle path", OnSetSource));
+            // Fix both min AND max so a long picked path can't expand the box and
+            // shove the type dropdown / Browse button off the row. The path still
+            // scrolls horizontally inside the fixed-width field.
             setSource_.MinimumSize = new VUI.Size(330, VUI.Widget.DontCare);
+            setSource_.MaximumSize = new VUI.Size(330, VUI.Widget.DontCare);
             setType_ = sp3.Add(new VUI.ComboBox<string>(
                 new string[] { "Folder", "AssetBundle" }, OnSetType));
             // Without an explicit minimum the closed combobox can collapse to
@@ -115,11 +122,15 @@ namespace Cue
             sp3.Add(new VUI.Button("Browse...", OnBrowse));
             Add(sp3);
 
+            // Test buttons are rebuilt per set: one per intensity name, or a
+            // single "Test (random)" when the set has no intensities.
             var sp4 = new VUI.Panel(new VUI.HorizontalFlow(8));
             sp4.Add(new VUI.Button("Reload clips", OnReloadSet));
-            sp4.Add(new VUI.Button("Test (soft)", () => OnTest(0.1f)));
-            sp4.Add(new VUI.Button("Test (medium)", () => OnTest(0.5f)));
-            sp4.Add(new VUI.Button("Test (hard)", () => OnTest(0.95f)));
+            for (int i = 0; i < testBtns_.Length; ++i)
+            {
+                int k = i;
+                testBtns_[k] = sp4.Add(new VUI.Button("Test", () => OnTest(testInt_[k])));
+            }
             setStatus_ = sp4.Add(new VUI.Label(""));
             Add(sp4);
 
@@ -229,7 +240,42 @@ namespace Cue
                 setStatus_.Text = "";
             }
 
+            ConfigureTestButtons(s);
+
             ignore_ = false;
+        }
+
+        // One test button per intensity band (labelled with the band name), or a
+        // single "Test (random)" when the set has no intensities. Hidden buttons
+        // are skipped by the flow layout, so the row reflows cleanly.
+        private void ConfigureTestButtons(Sound.SoundSet s)
+        {
+            for (int i = 0; i < testBtns_.Length; ++i)
+            {
+                if (testBtns_[i] != null)
+                    testBtns_[i].Visible = false;
+            }
+
+            if (s == null)
+                return;
+
+            if (s.HasIntensities)
+            {
+                var names = s.IntensityNames;
+                int count = System.Math.Min(names.Count, testBtns_.Length);
+                for (int i = 0; i < count; ++i)
+                {
+                    testInt_[i] = (count <= 1) ? 0.5f : (i + 0.5f) / count;
+                    testBtns_[i].Text = "Test: " + names[i];
+                    testBtns_[i].Visible = true;
+                }
+            }
+            else
+            {
+                testInt_[0] = 0.5f;
+                testBtns_[0].Text = "Test (random)";
+                testBtns_[0].Visible = true;
+            }
         }
 
         private void RefreshSets()
