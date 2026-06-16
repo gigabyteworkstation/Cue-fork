@@ -102,11 +102,21 @@ namespace Cue.Sound
     // ---- Curve ------------------------------------------------------------
     // Remaps an input range to an output range with a shaping function (RAGE's
     // audioengine/curve.h: linear / exponential / inverse-exp / s-curve).
-    public enum CurveType { Linear = 0, Exp = 1, InvExp = 2, SCurve = 3 }
+    //
+    // NOTE: plain int constants, NOT a C# enum -- VaM's runtime C# compiler
+    // crashes Unity when a plugin declares an enum, so the whole codebase uses
+    // const ints instead.
+    public static class CurveType
+    {
+        public const int Linear = 0;
+        public const int Exp    = 1;
+        public const int InvExp = 2;
+        public const int SCurve = 3;
+    }
 
     public class Curve
     {
-        public CurveType type = CurveType.Linear;
+        public int type = CurveType.Linear;
         public float inMin = 0f, inMax = 1f, outMin = 0f, outMax = 1f;
 
         public float Evaluate(float x)
@@ -126,7 +136,7 @@ namespace Cue.Sound
         public JSONClass ToJSON()
         {
             var o = new JSONClass();
-            o.Add("type",   new JSONData((int)type));
+            o.Add("type",   new JSONData(type));
             o.Add("inMin",  new JSONData(inMin));
             o.Add("inMax",  new JSONData(inMax));
             o.Add("outMin", new JSONData(outMin));
@@ -138,7 +148,7 @@ namespace Cue.Sound
         {
             if (o == null) return null;
             var c = new Curve();
-            int t = 0; J.OptInt(o, "type", ref t); c.type = (CurveType)t;
+            J.OptInt(o, "type", ref c.type);
             J.OptFloat(o, "inMin",  ref c.inMin);
             J.OptFloat(o, "inMax",  ref c.inMax);
             J.OptFloat(o, "outMin", ref c.outMin);
