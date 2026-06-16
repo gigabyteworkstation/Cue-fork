@@ -307,21 +307,24 @@ namespace Cue.Sound
             vagina_ = body.Get(BP.Vagina);
             lips_ = body.Get(BP.Lips);
 
-            // impact targets: only parts referenced by an enabled impact rule
-            // (or all of TargetParts when a rule has no part filter)
+            // Impact targets come from the GRAPH PATCHES now (the rule list is
+            // dead). Track exactly the parts that impact-trigger patches ask for
+            // -- including the vagina/anus etc. which aren't in the generic
+            // TargetParts fallback -- so "impact on <part>" actually fires there.
             bool anyPart = false;
             var wanted = new List<BodyPartType>();
 
-            for (int i = 0; i < rules_.Count; ++i)
+            var patches = graph_.Patches;
+            for (int i = 0; i < patches.Count; ++i)
             {
-                var r = rules_[i];
-                if (!r.enabled || r.trigger != SoundRule.TriggerImpact)
+                var p = patches[i];
+                if (!p.enabled || p.trigger != SoundRule.TriggerImpact)
                     continue;
 
-                if (r.part == BP.None)
+                if (p.part == BP.None)
                     anyPart = true;
-                else if (!wanted.Contains(r.part))
-                    wanted.Add(r.part);
+                else if (!wanted.Contains(p.part))
+                    wanted.Add(p.part);
             }
 
             if (anyPart)

@@ -66,6 +66,12 @@ namespace Cue.Sound
                 ? "Always"
                 : (trigger >= 0 && trigger < SoundRule.TriggerNames.Length
                     ? SoundRule.TriggerNames[trigger] : "?");
+
+            if (trigger == SoundRule.TriggerImpact && part != BP.None)
+                t += " " + BodyPartType.ToString(part);
+            else if (trigger != SoundRule.TriggerImpact && orifice != SoundRule.OrificeAny)
+                t += " " + SoundRule.OrificeNames[orifice];
+
             return name + "  (" + t + ")" + (enabled ? "" : " [off]");
         }
 

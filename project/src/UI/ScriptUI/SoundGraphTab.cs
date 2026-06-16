@@ -845,6 +845,12 @@ namespace Cue
 
         private void Save()
         {
+            // Force the event detector to re-resolve its tracked body parts now
+            // (e.g. you just set an impact patch to the vagina) instead of
+            // waiting for the next periodic rebuild.
+            if (person_.Sounds != null)
+                person_.Sounds.RulesChanged();
+
             Cue.Instance.SaveLater();
         }
     }
