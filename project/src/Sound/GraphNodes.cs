@@ -78,13 +78,14 @@ namespace Cue.Sound
                 case "layer":    return new LayerNode();
                 case "sequence": return new SequenceNode();
                 case "loop":     return new LoopNode();
+                case "math":     return new MathNode();
             }
             return null;
         }
 
         public static readonly string[] AllTypes = new string[]
         {
-            "clip", "gain", "pitch", "envelope", "random", "layer", "sequence", "loop"
+            "clip", "gain", "pitch", "math", "envelope", "random", "layer", "sequence", "loop"
         };
 
         protected NodeInstance CreateChild(int i, SoundContext ctx)
@@ -583,6 +584,104 @@ namespace Cue.Sound
             stopping_ = true;
             if (cur_ != null) cur_.Stop(immediate);
             if (immediate) Finished = true;
+        }
+    }
+
+
+    // ---- math (modulate child's gain or pitch by a computed value) -------
+    // Like gain/pitch, but the multiplier is a binary operation of two live
+    // GraphValues (so you can drive a pitch by, say, pen.velocity * arousal).
+    public static class MathOp
+    {
+        public const int Add = 0;
+        public const int Sub = 1;
+        public const int Mul = 2;
+        public const int Div = 3;
+        public const int Min = 4;
+        public const int Max = 5;
+
+        public static readonly string[] Names = new string[]
+        { "a + b", "a - b", "a * b", "a / b", "min(a,b)", "max(a,b)" };
+
+        public static float Apply(int op, float a, float b)
+        {
+            switch (op)
+            {
+                case Add: return a + b;
+                case Sub: return a - b;
+                case Mul: return a * b;
+                case Div: return (Mathf.Abs(b) > 1e-6f) ? a / b : 0f;
+                case Min: return Mathf.Min(a, b);
+                case Max: return Mathf.Max(a, b);
+            }
+            return a;
+        }
+    }
+
+    public static class MathTarget
+    {
+        public const int Gain = 0;
+        public const int Pitch = 1;
+        public static readonly string[] Names = new string[] { "gain", "pitch" };
+    }
+
+    public class MathNode : SoundNode
+    {
+        public GraphValue a = GraphValue.Const(1f);
+        public GraphValue b = GraphValue.Const(1f);
+        public int op = MathOp.Mul;
+        public int target = MathTarget.Pitch;
+
+        public override string Type { get { return "math"; } }
+        public override NodeInstance Create(SoundContext ctx)
+        {
+            return new MathInstance(ctx, CreateChild(0, ctx), this);
+        }
+        protected override void WriteJSON(JSONClass o)
+        {
+            o.Add("a", a.ToJSON());
+            o.Add("b", b.ToJSON());
+            o.Add("op", new JSONData(op));
+            o.Add("target", new JSONData(target));
+        }
+        protected override void ReadJSON(JSONClass o)
+        {
+            if (o.HasKey("a")) a = GraphValue.FromJSON(o["a"]);
+            if (o.HasKey("b")) b = GraphValue.FromJSON(o["b"]);
+            J.OptInt(o, "op", ref op);
+            J.OptInt(o, "target", ref target);
+        }
+    }
+
+    public class MathInstance : NodeInstance
+    {
+        private readonly NodeInstance child_;
+        private readonly MathNode node_;
+
+        public MathInstance(SoundContext ctx, NodeInstance child, MathNode n) : base(ctx)
+        {
+            child_ = child;
+            node_ = n;
+            if (child_ == null) Finished = true;
+        }
+
+        public override void Update(float s)
+        {
+            if (Finished || child_ == null) { Finished = true; return; }
+
+            float v = MathOp.Apply(node_.op, node_.a.Get(ctx), node_.b.Get(ctx));
+
+            child_.gainMul  = gainMul  * ((node_.target == MathTarget.Gain)  ? v : 1f);
+            child_.pitchMul = pitchMul * ((node_.target == MathTarget.Pitch) ? v : 1f);
+            child_.Update(s);
+
+            Finished = child_.Finished;
+        }
+
+        public override void Stop(bool immediate)
+        {
+            if (child_ != null) child_.Stop(immediate);
+            Finished = true;
         }
     }
 

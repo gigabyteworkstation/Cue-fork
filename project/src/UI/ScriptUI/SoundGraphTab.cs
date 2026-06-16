@@ -50,6 +50,9 @@ namespace Cue
         // envelope sliders
         private VUI.FloatTextSlider envAttack_, envHold_, envRelease_;
 
+        // math node
+        private VUI.ComboBox<string> mathOp_, mathTarget_;
+
         // ---- probes
         private VUI.ComboBox<Sound.PhysicsProbe> probes_;
         private VUI.ComboBox<string> probeAddType_;
@@ -208,6 +211,15 @@ namespace Cue
             envHold_    = ne.Add(new VUI.FloatTextSlider(0f, 0f, 10f, OnEnvHold));
             envRelease_ = ne.Add(new VUI.FloatTextSlider(0.1f, 0f, 5f, OnEnvRelease));
             Add(ne);
+
+            var nm = new VUI.Panel(new VUI.HorizontalFlow(6));
+            nm.Add(new VUI.Label("Op:"));
+            mathOp_ = nm.Add(new VUI.ComboBox<string>(Sound.MathOp.Names, OnMathOp));
+            mathOp_.MinimumSize = new VUI.Size(120, VUI.Widget.DontCare);
+            nm.Add(new VUI.Label("Modulates:"));
+            mathTarget_ = nm.Add(new VUI.ComboBox<string>(Sound.MathTarget.Names, OnMathTarget));
+            mathTarget_.MinimumSize = new VUI.Size(100, VUI.Widget.DontCare);
+            Add(nm);
 
             // ---- probes ----
             Add(new VUI.Label("Physics probes", UnityEngine.FontStyle.Bold));
@@ -462,6 +474,7 @@ namespace Cue
                 gvBound_[i] = null;
             }
             envAttack_.Visible = envHold_.Visible = envRelease_.Visible = false;
+            mathOp_.Visible = mathTarget_.Visible = false;
 
             var nr = CurrentNodeRef();
             if (nr == null) { nodeTypeLabel_.Text = "node: (none)"; ignore_ = false; return; }
@@ -474,6 +487,7 @@ namespace Cue
             var pitch = nr.node as Sound.PitchNode;
             var loop = nr.node as Sound.LoopNode;
             var env = nr.node as Sound.EnvelopeNode;
+            var math = nr.node as Sound.MathNode;
 
             if (clip != null)
             {
@@ -505,6 +519,15 @@ namespace Cue
                 envAttack_.Value = env.attack;
                 envHold_.Value = env.hold;
                 envRelease_.Value = env.release;
+            }
+            else if (math != null)
+            {
+                ConfigGv(0, "a:", math.a, -2f, 2f);
+                ConfigGv(1, "b:", math.b, -2f, 2f);
+                mathOp_.Visible = true;
+                mathOp_.Select(math.op);
+                mathTarget_.Visible = true;
+                mathTarget_.Select(math.target);
             }
 
             ignore_ = false;
@@ -595,6 +618,22 @@ namespace Cue
         private void OnEnvAttack(float f)  { EnvSet(0, f); }
         private void OnEnvHold(float f)    { EnvSet(1, f); }
         private void OnEnvRelease(float f) { EnvSet(2, f); }
+
+        private void OnMathOp(int i)
+        {
+            if (ignore_) return;
+            var nr = CurrentNodeRef();
+            var m = (nr != null) ? nr.node as Sound.MathNode : null;
+            if (m != null) { m.op = i; Save(); }
+        }
+
+        private void OnMathTarget(int i)
+        {
+            if (ignore_) return;
+            var nr = CurrentNodeRef();
+            var m = (nr != null) ? nr.node as Sound.MathNode : null;
+            if (m != null) { m.target = i; Save(); }
+        }
 
         private void EnvSet(int which, float f)
         {

@@ -221,7 +221,10 @@ namespace Cue.Sound
         public List<SoundRule> Rules { get { return rules_; } }
         public SoundGraphEngine Graph { get { return graph_; } }
 
-        private static bool GraphMode { get { return SoundManager.Instance.GraphEnabled; } }
+        // The node-graph engine is now the only event->sound path; the legacy
+        // per-rule firing below is dead (kept only so this stays a small, safe
+        // change -- it can be fully deleted later).
+        private static bool GraphMode { get { return true; } }
 
         private void CreateDefaultRules()
         {
