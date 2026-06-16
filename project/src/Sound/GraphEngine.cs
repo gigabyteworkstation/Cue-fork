@@ -60,6 +60,15 @@ namespace Cue.Sound
             return o;
         }
 
+        public override string ToString()
+        {
+            string t = (trigger == TriggerAlways)
+                ? "Always"
+                : (trigger >= 0 && trigger < SoundRule.TriggerNames.Length
+                    ? SoundRule.TriggerNames[trigger] : "?");
+            return name + "  (" + t + ")" + (enabled ? "" : " [off]");
+        }
+
         public static SoundPatch FromJSON(JSONClass o)
         {
             if (o == null) return null;

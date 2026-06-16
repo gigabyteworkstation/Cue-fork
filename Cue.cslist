@@ -13,6 +13,7 @@ project\src\Sound\GraphEngine.cs
 project\src\Sound\PhysicsProbes.cs
 project\src\Integration\FoostPlugins.cs
 project\src\UI\ScriptUI\SoundTab.cs
+project\src\UI\ScriptUI\SoundGraphTab.cs
 project\src\AI\Events.cs
 project\src\AI\UrgeActuator.cs
 project\src\AI\Events\Grab.cs

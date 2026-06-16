@@ -340,6 +340,7 @@ namespace Cue
 			// stay visible in the tab strip instead of being cut off at the end.
 			AddSubTab(new ArousalSystemTab(person_));
 			AddSubTab(new SoundTab(person_));
+			AddSubTab(new SoundGraphTab(person_));
 			AddSubTab(new PersonBodyTab(person_));
 			AddSubTab(new PersonDebugAnimationsTab(person_));
 			AddSubTab(new PersonDumpTab(person_));

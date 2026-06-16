@@ -105,6 +105,11 @@ namespace Cue.Sound
             return p;
         }
 
+        public override string ToString()
+        {
+            return name + "  [" + Type + "]" + (enabled ? "" : " (off)");
+        }
+
         public static PhysicsProbe CreateByType(string t)
         {
             switch (t)
