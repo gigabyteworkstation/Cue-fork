@@ -208,14 +208,20 @@ namespace Cue.Sound
         private int impactsFired_ = 0;
         private int eventsFired_ = 0;
 
+        private readonly SoundGraphEngine graph_;
+
         public SoundEventsEngine(Person p)
         {
             person_ = p;
             log_ = new Logger(Logger.Object, p, "sounds");
             CreateDefaultRules();
+            graph_ = new SoundGraphEngine(p);
         }
 
         public List<SoundRule> Rules { get { return rules_; } }
+        public SoundGraphEngine Graph { get { return graph_; } }
+
+        private static bool GraphMode { get { return SoundManager.Instance.GraphEnabled; } }
 
         private void CreateDefaultRules()
         {
@@ -281,6 +287,12 @@ namespace Cue.Sound
             UpdateImpacts(s);
             UpdatePenetration(s);
             UpdateFingering(s);
+
+            // The detectors above feed events to whichever engine is active; the
+            // graph engine also needs a per-frame tick to advance running
+            // instances and refresh its signal table.
+            if (GraphMode)
+                graph_.Update(s);
         }
 
         // Resolves body-part references and pair-state arrays. Runs every
@@ -601,6 +613,16 @@ namespace Cue.Sound
             int trigger, string orifice, UnityEngine.Vector3 pos,
             float rawSpeed, float now)
         {
+            if (GraphMode)
+            {
+                graph_.OnEvent(trigger, new SignalArgs
+                {
+                    pos = pos, intensity = Mathf.Clamp01(rawSpeed / 1.2f),
+                    part = BP.None, orifice = orifice
+                });
+                return;
+            }
+
             for (int i = 0; i < rules_.Count; ++i)
             {
                 var r = rules_[i];
@@ -630,6 +652,16 @@ namespace Cue.Sound
 
         private void FireImpact(BodyPartType part, UnityEngine.Vector3 pos, float rawSpeed)
         {
+            if (GraphMode)
+            {
+                graph_.OnEvent(SoundRule.TriggerImpact, new SignalArgs
+                {
+                    pos = pos, intensity = Mathf.Clamp01(rawSpeed / 3f),
+                    part = part, orifice = null
+                });
+                return;
+            }
+
             float now = Cue.Instance.Sys.RealtimeSinceStartup;
 
             for (int i = 0; i < rules_.Count; ++i)
@@ -652,6 +684,15 @@ namespace Cue.Sound
             int trigger, string orifice, UnityEngine.Vector3 pos,
             float intensity, float now)
         {
+            if (GraphMode)
+            {
+                graph_.OnEvent(trigger, new SignalArgs
+                {
+                    pos = pos, intensity = intensity, part = BP.None, orifice = orifice
+                });
+                return;
+            }
+
             for (int i = 0; i < rules_.Count; ++i)
             {
                 var r = rules_[i];
@@ -713,28 +754,38 @@ namespace Cue.Sound
             for (int i = 0; i < rules_.Count; ++i)
                 a.Add(rules_[i].ToJSON());
             o.Add("rules", a);
+
+            if (graph_ != null)
+                o.Add("graph", graph_.ToJSON());
+
             return o;
         }
 
         public void Load(JSONClass o)
         {
-            if (o == null || !o.HasKey("rules"))
+            if (o == null)
                 return;
 
-            rules_.Clear();
-
-            var a = o["rules"].AsArray;
-            if (a != null)
+            if (o.HasKey("rules"))
             {
-                foreach (JSONNode n in a)
+                rules_.Clear();
+
+                var a = o["rules"].AsArray;
+                if (a != null)
                 {
-                    var r = SoundRule.FromJSON(n.AsObject);
-                    if (r != null)
-                        rules_.Add(r);
+                    foreach (JSONNode n in a)
+                    {
+                        var r = SoundRule.FromJSON(n.AsObject);
+                        if (r != null)
+                            rules_.Add(r);
+                    }
                 }
+
+                RulesChanged();
             }
 
-            RulesChanged();
+            if (o.HasKey("graph") && graph_ != null)
+                graph_.Load(o["graph"].AsObject);
         }
 
         public void Debug(DebugLines debug)

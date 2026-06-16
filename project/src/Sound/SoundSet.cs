@@ -444,6 +444,11 @@ namespace Cue.Sound
         private readonly SoundPlayer player_ = new SoundPlayer();
         private float masterVolume_ = 1.0f;
 
+        // Master switch between the legacy per-rule engine and the new sound
+        // graph runtime (beta). Off by default so behaviour is unchanged until
+        // the user opts in; persisted with the scene.
+        private bool graphEnabled_ = false;
+
         public static SoundManager Instance
         {
             get
@@ -461,6 +466,12 @@ namespace Cue.Sound
         {
             get { return masterVolume_; }
             set { masterVolume_ = U.Clamp(value, 0, 2); }
+        }
+
+        public bool GraphEnabled
+        {
+            get { return graphEnabled_; }
+            set { graphEnabled_ = value; }
         }
 
         public SoundSet Find(string name)
@@ -531,6 +542,7 @@ namespace Cue.Sound
         {
             var o = new JSONClass();
             o.Add("masterVolume", new JSONData(masterVolume_));
+            o.Add("graphEnabled", new JSONData(graphEnabled_));
 
             var a = new JSONArray();
             for (int i = 0; i < sets_.Count; ++i)
@@ -547,6 +559,10 @@ namespace Cue.Sound
             float mv = masterVolume_;
             if (J.OptFloat(o, "masterVolume", ref mv))
                 masterVolume_ = mv;
+
+            bool ge = graphEnabled_;
+            if (J.OptBool(o, "graphEnabled", ref ge))
+                graphEnabled_ = ge;
 
             for (int i = 0; i < sets_.Count; ++i)
                 sets_[i].Destroy();

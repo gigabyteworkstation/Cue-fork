@@ -82,6 +82,10 @@ namespace Cue
             masterVolume_ = mv.Add(new VUI.FloatTextSlider(
                 Manager.MasterVolume, 0f, 2f, OnMasterVolume));
             masterVolume_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
+            mv.Add(new VUI.CheckBox(
+                "Use sound graph (beta)", OnGraphToggle, Manager.GraphEnabled,
+                "Route events through the new node-graph engine instead of the rule list. " +
+                "Graphs default to sets named slaps / wet / wet_in / wet_out / fingering / orgasm."));
             Add(mv);
 
             // ---- sound sets ----------------------------------------------
@@ -297,6 +301,13 @@ namespace Cue
         {
             if (ignore_) return;
             Manager.MasterVolume = f;
+            Cue.Instance.SaveLater();
+        }
+
+        private void OnGraphToggle(bool b)
+        {
+            if (ignore_) return;
+            Manager.GraphEnabled = b;
             Cue.Instance.SaveLater();
         }
 
