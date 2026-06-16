@@ -319,15 +319,8 @@ namespace Cue.Sound
 
         private void CreateDefaults()
         {
+            // Intentionally empty: probes are created by the user in the UI.
             probes_.Clear();
-
-            var tongue = new DistanceProbe { name = "tipToTongue", a = ProbePoint.Pen(), b = ProbePoint.Part(BP.Lips) };
-            var vag    = new DistanceProbe { name = "tipToVagina", a = ProbePoint.Pen(), b = ProbePoint.Part(BP.Vagina) };
-            var handV  = new VelocityProbe { name = "handVel",     a = ProbePoint.Part(BP.RightHand) };
-
-            probes_.Add(tongue);
-            probes_.Add(vag);
-            probes_.Add(handV);
         }
 
         public JSONClass ToJSON()

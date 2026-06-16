@@ -217,7 +217,7 @@ namespace VUI
 					visible_ = value;
 					UpdateActiveState();
 
-					if (!visible_)
+					if (true) /* relayout on show too: fixes overlap */
 						NeedsLayout("visibility changed to hidden", true);
 				}
 			}

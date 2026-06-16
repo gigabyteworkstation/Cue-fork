@@ -277,51 +277,9 @@ namespace Cue.Sound
 
         private void CreateDefaultPatches()
         {
+            // Intentionally empty: the user builds patches from scratch in the
+            // Graph tab.
             patches_.Clear();
-
-            patches_.Add(ImpactPatch("slap L", BP.LeftGlute, "slaps"));
-            patches_.Add(ImpactPatch("slap R", BP.RightGlute, "slaps"));
-            patches_.Add(EventPatch("entry", SoundRule.TriggerPenEntry, "wet", 1f));
-            patches_.Add(EventPatch("exit",  SoundRule.TriggerPenExit,  "wet", 0.6f));
-            patches_.Add(ThrustPatch("slide in",  SoundRule.TriggerThrustIn,  "wet_in"));
-            patches_.Add(ThrustPatch("slide out", SoundRule.TriggerThrustOut, "wet_out"));
-            patches_.Add(EventPatch("finger in", SoundRule.TriggerFingerEntry, "fingering", 1f));
-            patches_.Add(EventPatch("orgasm", SoundRule.TriggerOrgasm, "orgasm", 1f));
-        }
-
-        private static SoundPatch ImpactPatch(string name, BodyPartType part, string set)
-        {
-            var p = new SoundPatch { name = name, trigger = SoundRule.TriggerImpact, part = part };
-            p.root = new ClipNode { set = set, intensity = GraphValue.Var(GVar.EventIntensity) };
-            return p;
-        }
-
-        private static SoundPatch EventPatch(string name, int trigger, string set, float gain)
-        {
-            var p = new SoundPatch { name = name, trigger = trigger };
-            p.root = new ClipNode
-            {
-                set = set,
-                intensity = GraphValue.Var(GVar.EventIntensity),
-                gain = GraphValue.Const(gain)
-            };
-            return p;
-        }
-
-        private static SoundPatch ThrustPatch(string name, int trigger, string set)
-        {
-            var p = new SoundPatch { name = name, trigger = trigger, minInterval = 0.10f };
-            // pitch rises with stroke velocity (variable -> curve), a small taste
-            // of what the graph can do that the old rules could not express.
-            var pitch = GraphValue.Var(GVar.PenVelocity,
-                new Curve { type = CurveType.Linear, inMin = 0f, inMax = 1f, outMin = 0.95f, outMax = 1.25f });
-            p.root = new ClipNode
-            {
-                set = set,
-                intensity = GraphValue.Var(GVar.PenVelocity),
-                pitch = pitch
-            };
-            return p;
         }
 
         public JSONClass ToJSON()
