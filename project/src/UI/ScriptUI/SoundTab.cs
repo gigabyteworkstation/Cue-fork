@@ -23,6 +23,7 @@ namespace Cue
         private float[] testInt_ = new float[8];
 
         private bool ignore_ = false;
+        private int seenSets_ = -1;   // self-heal when sets load after UI build
 
         public SoundTab(Person p)
             : base("Sound Sets", false)
@@ -101,6 +102,7 @@ namespace Cue
             ignore_ = true;
             sets_.SetItems(Manager.Sets);
             ignore_ = false;
+            seenSets_ = Manager.Sets.Count;
         }
 
         private void ShowSelectedSet()
@@ -273,6 +275,13 @@ namespace Cue
 
         protected override void DoUpdate(float s)
         {
+            // self-heal when sets are loaded after this tab was built
+            if (Manager.Sets.Count != seenSets_)
+            {
+                RefreshSetList();
+                ShowSelectedSet();
+            }
+
             var set = sets_.Selected;
             if (set != null)
                 setStatus_.Text = set.Status;

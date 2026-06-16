@@ -76,6 +76,11 @@ namespace Cue
         private VUI.ComboBox<string> probePartA_, probePartB_;
         private VUI.FloatTextSlider probeRadius_;
 
+        // last-seen engine list sizes, so the tab self-heals when data is loaded
+        // AFTER the UI was built (the plugin builds its UI before CheckConfig
+        // restores the saved graph)
+        private int seenPatches_ = -1, seenProbes_ = -1, seenLogic_ = -1, seenSets_ = -1;
+
         private readonly List<NodeRef> nodeRefs_ = new List<NodeRef>();
         private readonly List<string> partNames_ = new List<string>();
         private readonly List<string> sourceNames_ = new List<string>();
@@ -165,7 +170,9 @@ namespace Cue
 
         private void Build()
         {
-            Layout = new VUI.VerticalFlow(6);
+            // tight spacing: VUI has no scroll container, so we pack rows to fit
+            // as much of the (tall) editor in the panel as possible
+            Layout = new VUI.VerticalFlow(2);
 
             Add(new VUI.Label("Patches", UnityEngine.FontStyle.Bold));
 
@@ -341,6 +348,7 @@ namespace Cue
             ignore_ = true;
             patches_.SetItems(Engine.Patches);
             ignore_ = false;
+            seenPatches_ = Engine.Patches.Count;
         }
 
         private void ShowSelectedPatch()
@@ -767,6 +775,7 @@ namespace Cue
             ignore_ = true;
             probes_.SetItems(ProbeMgr.Probes);
             ignore_ = false;
+            seenProbes_ = ProbeMgr.Probes.Count;
         }
 
         private void ShowSelectedProbe()
@@ -950,6 +959,39 @@ namespace Cue
             ignore_ = true;
             logicList_.SetItems(LogicList);
             ignore_ = false;
+            seenLogic_ = LogicList.Count;
+        }
+
+        // Self-heal: when the engine's data changes outside the UI (most
+        // importantly when the saved graph loads after this tab was built),
+        // rebuild the affected lists so they actually show the loaded data.
+        protected override void DoUpdate(float s)
+        {
+            if (Engine == null) return;
+
+            if (Engine.Patches.Count != seenPatches_)
+            {
+                RefreshPatchList();
+                ShowSelectedPatch();
+            }
+            if (ProbeMgr != null && ProbeMgr.Probes.Count != seenProbes_)
+            {
+                RefreshProbeList();
+                ShowSelectedProbe();
+            }
+            if (LogicList != null && LogicList.Count != seenLogic_)
+            {
+                RefreshLogicList();
+                ShowSelectedLogic();
+            }
+
+            int sets = Sound.SoundManager.Instance.Sets.Count;
+            if (sets != seenSets_)
+            {
+                seenSets_ = sets;
+                // refresh the clip-set dropdown for the currently-shown node
+                ShowSelectedNode();
+            }
         }
 
         private void ShowSelectedLogic()
