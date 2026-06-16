@@ -22,18 +22,34 @@ namespace Cue.Sound
         public const int Boredom     = 7;   // brain boredom 0..1
         public const int Time        = 8;   // seconds since graph start
 
-        public const int TableCount  = 9;   // stored in the per-person table
+        // Per-orifice penetration (the "primary" pen.* above mirrors whichever
+        // is active). Each is active 0/1, plus its own depth and velocity, so a
+        // graph can react differently to oral vs anal vs vaginal.
+        public const int OralActive    = 9;
+        public const int OralDepth     = 10;
+        public const int OralVelocity  = 11;
+        public const int AnalActive    = 12;
+        public const int AnalDepth     = 13;
+        public const int AnalVelocity  = 14;
+        public const int VagActive     = 15;
+        public const int VagDepth      = 16;
+        public const int VagVelocity   = 17;
+
+        public const int TableCount  = 18;  // stored in the per-person table
 
         // "virtual" ids resolved from per-instance context, not the table
-        public const int EventIntensity = 9;   // intensity of the triggering event
-        public const int Random         = 10;  // fresh 0..1 each read
+        public const int EventIntensity = 18;  // intensity of the triggering event
+        public const int Random         = 19;  // fresh 0..1 each read
 
-        public const int Count = 11;
+        public const int Count = 20;
 
         public static readonly string[] Names = new string[]
         {
             "pen.active", "pen.velocity", "pen.depth", "pen.dir", "pen.girth",
             "arousal", "urge", "boredom", "time",
+            "oral.active", "oral.depth", "oral.velocity",
+            "anal.active", "anal.depth", "anal.velocity",
+            "vaginal.active", "vaginal.depth", "vaginal.velocity",
             "event.intensity", "random"
         };
 

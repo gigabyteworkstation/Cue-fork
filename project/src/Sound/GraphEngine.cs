@@ -213,14 +213,37 @@ namespace Cue.Sound
                 vars_[GVar.PenGirth] = brain.CurrentGirth;
             }
 
+            // clear per-orifice each frame; the active one is filled below
+            vars_[GVar.OralActive] = 0f; vars_[GVar.OralDepth] = 0f; vars_[GVar.OralVelocity] = 0f;
+            vars_[GVar.AnalActive] = 0f; vars_[GVar.AnalDepth] = 0f; vars_[GVar.AnalVelocity] = 0f;
+            vars_[GVar.VagActive]  = 0f; vars_[GVar.VagDepth]  = 0f; vars_[GVar.VagVelocity]  = 0f;
+
             var pen = (person_.ArousalSystem != null) ? person_.ArousalSystem.PenStats : null;
-            if (pen != null)
+            if (pen != null && pen.Active)
             {
-                vars_[GVar.PenActive] = pen.Active ? 1f : 0f;
-                vars_[GVar.PenVelocity] = Mathf.Clamp01(pen.NormalisedSpeed);
-                vars_[GVar.PenDepth] = Mathf.Clamp01(pen.NormalisedDepth);
+                float depth = Mathf.Clamp01(pen.NormalisedDepth);
+                float speed = Mathf.Clamp01(pen.NormalisedSpeed);
                 float v = pen.SmoothedVelocity;
+
+                vars_[GVar.PenActive] = 1f;
+                vars_[GVar.PenVelocity] = speed;
+                vars_[GVar.PenDepth] = depth;
                 vars_[GVar.PenDir] = (v > 0.03f) ? 1f : (v < -0.03f) ? -1f : 0f;
+
+                // route into the per-orifice signals (DildoLanguage reports the
+                // orifice name; this is the reliable per-orifice source)
+                switch (pen.OrificeName)
+                {
+                    case "Mouth":
+                        vars_[GVar.OralActive] = 1f; vars_[GVar.OralDepth] = depth; vars_[GVar.OralVelocity] = speed;
+                        break;
+                    case "Anus":
+                        vars_[GVar.AnalActive] = 1f; vars_[GVar.AnalDepth] = depth; vars_[GVar.AnalVelocity] = speed;
+                        break;
+                    case "Vagina":
+                        vars_[GVar.VagActive] = 1f; vars_[GVar.VagDepth] = depth; vars_[GVar.VagVelocity] = speed;
+                        break;
+                }
             }
             else
             {
