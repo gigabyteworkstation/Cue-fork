@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using SimpleJSON;
 using UnityEngine;
 
@@ -67,11 +68,20 @@ namespace Cue.Sound
     public class SoundContext
     {
         public float[] Vars;                  // global signals (size GVar.TableCount)
+        public Dictionary<string, float> Custom; // probe outputs, by user-chosen name
         public float Intensity = 1f;          // triggering event intensity
         public UnityEngine.Vector3 Position;  // where to play
         public float Now = 0f;                // realtime seconds
         public Person Person = null;
         public System.Random Rng = null;
+
+        public float GetCustom(string name)
+        {
+            float v;
+            if (Custom != null && name != null && Custom.TryGetValue(name, out v))
+                return v;
+            return 0f;
+        }
 
         public float GetVar(int id)
         {
@@ -143,19 +153,25 @@ namespace Cue.Sound
     // remapped through a curve. This is what makes node parameters "live".
     public class GraphValue
     {
-        public float constant = 1f;
-        public int   varId = -1;       // -1 => use constant
-        public Curve curve = null;     // optional remap when varId >= 0
+        public float  constant = 1f;
+        public int    varId = -1;       // built-in signal id, -1 => use constant
+        public string varName = null;   // custom (probe) variable name; wins over varId
+        public Curve  curve = null;      // optional remap of the variable
 
         public GraphValue() { }
         public GraphValue(float c) { constant = c; }
 
         public float Get(SoundContext ctx)
         {
-            if (varId < 0)
+            float v;
+
+            if (!string.IsNullOrEmpty(varName))
+                v = ctx.GetCustom(varName);
+            else if (varId >= 0)
+                v = ctx.GetVar(varId);
+            else
                 return constant;
 
-            float v = ctx.GetVar(varId);
             if (curve != null)
                 v = curve.Evaluate(v);
             return v;
@@ -168,11 +184,18 @@ namespace Cue.Sound
             return new GraphValue { varId = id, curve = c };
         }
 
+        public static GraphValue Custom_(string name, Curve c = null)
+        {
+            return new GraphValue { varName = name, curve = c };
+        }
+
         public JSONClass ToJSON()
         {
             var o = new JSONClass();
             o.Add("k", new JSONData(constant));
             o.Add("v", new JSONData(varId));
+            if (!string.IsNullOrEmpty(varName))
+                o.Add("vn", varName);
             if (curve != null)
                 o.Add("curve", curve.ToJSON());
             return o;
@@ -186,6 +209,7 @@ namespace Cue.Sound
             var g = new GraphValue();
             J.OptFloat(o, "k", ref g.constant);
             J.OptInt(o, "v", ref g.varId);
+            g.varName = J.OptString(o, "vn", null);
             if (o.HasKey("curve"))
                 g.curve = Curve.FromJSON(o["curve"].AsObject);
             return g;

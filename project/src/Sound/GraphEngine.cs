@@ -89,6 +89,7 @@ namespace Cue.Sound
         private readonly float[] vars_ = new float[GVar.TableCount];
         private readonly List<SoundPatch> patches_ = new List<SoundPatch>();
         private readonly System.Random rng_;
+        private readonly PhysicsProbeManager probes_;
 
         private class Running
         {
@@ -105,12 +106,14 @@ namespace Cue.Sound
         {
             person_ = p;
             rng_ = new System.Random(System.Guid.NewGuid().GetHashCode());
+            probes_ = new PhysicsProbeManager(p);
             CreateDefaultPatches();
         }
 
         public List<SoundPatch> Patches { get { return patches_; } }
         public float[] Vars { get { return vars_; } }
         public int RunningCount { get { return running_.Count; } }
+        public PhysicsProbeManager Probes { get { return probes_; } }
 
         // ---- signals & events --------------------------------------------
 
@@ -157,6 +160,7 @@ namespace Cue.Sound
             var ctx = new SoundContext
             {
                 Vars = vars_,
+                Custom = probes_.Outputs,
                 Intensity = Mathf.Clamp01(intensity),
                 Position = pos,
                 Now = elapsed_,
@@ -176,6 +180,7 @@ namespace Cue.Sound
         {
             elapsed_ += s;
 
+            probes_.Update(s);
             RefreshSignals();
 
             if (!startedAlways_)
@@ -317,6 +322,7 @@ namespace Cue.Sound
             for (int i = 0; i < patches_.Count; ++i)
                 a.Add(patches_[i].ToJSON());
             o.Add("patches", a);
+            o.Add("probes", probes_.ToJSON());
             return o;
         }
 
@@ -338,6 +344,9 @@ namespace Cue.Sound
                         patches_.Add(p);
                 }
             }
+
+            if (o.HasKey("probes"))
+                probes_.Load(o["probes"].AsObject);
         }
     }
 }
