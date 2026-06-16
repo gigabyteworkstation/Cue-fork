@@ -32,6 +32,20 @@ namespace Cue
         private VUI.ComboBox<string> patchOrifice_;
         private VUI.FloatTextSlider patchInterval_;
         private VUI.CheckBox patchEnabled_;
+        private VUI.TextBox patchCustom_;
+
+        // ---- logic
+        private VUI.ComboBox<Sound.LogicOp> logicList_;
+        private VUI.CheckBox logicEnabled_;
+        private VUI.ComboBox<string> logicKind_;
+        private VUI.Label[] lgvLabel_ = new VUI.Label[2];
+        private VUI.ComboBox<string>[] lgvSource_ = new VUI.ComboBox<string>[2];
+        private VUI.FloatTextSlider[] lgvSlider_ = new VUI.FloatTextSlider[2];
+        private Sound.GraphValue[] lgvBound_ = new Sound.GraphValue[2];
+        private VUI.ComboBox<string> logicOp_;
+        private VUI.ComboBox<string> logicCmp_;
+        private VUI.TextBox logicOutVar_;
+        private VUI.TextBox logicTrigName_;
 
         // ---- node tree
         private VUI.ComboBox<string> nodeList_;
@@ -78,6 +92,8 @@ namespace Cue
             ShowSelectedPatch();
             RefreshProbeList();
             ShowSelectedProbe();
+            RefreshLogicList();
+            ShowSelectedLogic();
         }
 
         public override bool DebugOnly { get { return false; } }
@@ -133,6 +149,16 @@ namespace Cue
                     if (!string.IsNullOrEmpty(ps[i].name))
                         sourceNames_.Add("probe:" + ps[i].name);
             }
+
+            if (LogicList != null)
+            {
+                for (int i = 0; i < LogicList.Count; ++i)
+                {
+                    var op = LogicList[i];
+                    if (op.kind == Sound.LogicKind.Assign && !string.IsNullOrEmpty(op.outVar))
+                        sourceNames_.Add("var:" + op.outVar);
+                }
+            }
         }
 
         // ---------------------------------------------------------------------
@@ -172,6 +198,13 @@ namespace Cue
             patchOrifice_ = p4.Add(new VUI.ComboBox<string>(Sound.SoundRule.OrificeNames, OnPatchOrifice));
             patchOrifice_.MinimumSize = new VUI.Size(130, VUI.Widget.DontCare);
             Add(p4);
+
+            var p5 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            p5.Add(new VUI.Label("Custom trigger:"));
+            patchCustom_ = p5.Add(new VUI.TextBox(
+                "", "blank = use event above; else fired by a logic op", OnPatchCustom));
+            patchCustom_.MinimumSize = new VUI.Size(280, VUI.Widget.DontCare);
+            Add(p5);
 
             // ---- node tree ----
             Add(new VUI.Label("Node tree", UnityEngine.FontStyle.Bold));
@@ -251,6 +284,53 @@ namespace Cue
             r3.Add(new VUI.Label("Radius:"));
             probeRadius_ = r3.Add(new VUI.FloatTextSlider(0.05f, 0f, 0.3f, OnProbeRadius));
             Add(r3);
+
+            // ---- logic ----
+            Add(new VUI.Label("Logic (per frame)", UnityEngine.FontStyle.Bold));
+
+            var l1 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            logicList_ = l1.Add(new VUI.ComboBox<Sound.LogicOp>(OnLogicSelected));
+            logicList_.MinimumSize = new VUI.Size(260, VUI.Widget.DontCare);
+            l1.Add(new VUI.Button("Add", OnAddLogic));
+            l1.Add(new VUI.Button("Remove", OnRemoveLogic));
+            logicEnabled_ = l1.Add(new VUI.CheckBox("Enabled", OnLogicEnabled));
+            Add(l1);
+
+            var l2 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            l2.Add(new VUI.Label("Kind:"));
+            logicKind_ = l2.Add(new VUI.ComboBox<string>(Sound.LogicKind.Names, OnLogicKind));
+            logicKind_.MinimumSize = new VUI.Size(130, VUI.Widget.DontCare);
+            Add(l2);
+
+            for (int i = 0; i < 2; ++i)
+            {
+                int k = i;
+                var row = new VUI.Panel(new VUI.HorizontalFlow(6));
+                lgvLabel_[k] = row.Add(new VUI.Label(k == 0 ? "a:" : "b:"));
+                lgvSource_[k] = row.Add(new VUI.ComboBox<string>(
+                    new string[] { "(constant)" }, (idx) => OnLgvSource(k, idx)));
+                lgvSource_[k].MinimumSize = new VUI.Size(160, VUI.Widget.DontCare);
+                lgvSlider_[k] = row.Add(new VUI.FloatTextSlider(0f, -5f, 5f, (f) => OnLgvConst(k, f)));
+                Add(row);
+            }
+
+            var l3 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            l3.Add(new VUI.Label("Op:"));
+            logicOp_ = l3.Add(new VUI.ComboBox<string>(Sound.MathOp.Names, OnLogicOp));
+            logicOp_.MinimumSize = new VUI.Size(110, VUI.Widget.DontCare);
+            l3.Add(new VUI.Label("Compare:"));
+            logicCmp_ = l3.Add(new VUI.ComboBox<string>(Sound.CmpOp.Names, OnLogicCmp));
+            logicCmp_.MinimumSize = new VUI.Size(110, VUI.Widget.DontCare);
+            Add(l3);
+
+            var l4 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            l4.Add(new VUI.Label("Out var:"));
+            logicOutVar_ = l4.Add(new VUI.TextBox("", "variable name", OnLogicOutVar));
+            logicOutVar_.MinimumSize = new VUI.Size(140, VUI.Widget.DontCare);
+            l4.Add(new VUI.Label("Trigger:"));
+            logicTrigName_ = l4.Add(new VUI.TextBox("", "trigger name", OnLogicTrigName));
+            logicTrigName_.MinimumSize = new VUI.Size(140, VUI.Widget.DontCare);
+            Add(l4);
         }
 
         // ===================== PATCHES =====================
@@ -276,12 +356,20 @@ namespace Cue
                 patchPart_.Select(PartToIndex(p.part));
                 patchOrifice_.Select(p.orifice);
                 patchInterval_.Value = p.minInterval;
+                patchCustom_.Text = p.customTrigger;
             }
 
             ignore_ = false;
 
             RebuildNodeList();
             ShowSelectedNode();
+        }
+
+        private void OnPatchCustom(string s)
+        {
+            if (ignore_ || patches_.Selected == null) return;
+            patches_.Selected.customTrigger = s;
+            Save();
         }
 
         private int TriggerToIndex(int trigger)
@@ -554,8 +642,9 @@ namespace Cue
         {
             if (!string.IsNullOrEmpty(gv.varName))
             {
-                string key = "probe:" + gv.varName;
-                int idx = sourceNames_.IndexOf(key);
+                int idx = sourceNames_.IndexOf("probe:" + gv.varName);
+                if (idx < 0) idx = sourceNames_.IndexOf("var:" + gv.varName);
+                if (idx < 0) idx = sourceNames_.IndexOf(gv.varName);
                 return (idx >= 0) ? idx : 0;
             }
             if (gv.varId >= 0)
@@ -563,10 +652,13 @@ namespace Cue
             return 0;
         }
 
-        private void OnGvSource(int row, int idx)
+        private void OnGvSource(int row, int idx) { ApplyGvSource(gvBound_[row], idx); }
+
+        // Maps a source-dropdown index to a GraphValue binding: 0=constant,
+        // 1..N=built-in signal, then probe:/var: custom variables.
+        private void ApplyGvSource(Sound.GraphValue gv, int idx)
         {
-            if (ignore_ || gvBound_[row] == null) return;
-            var gv = gvBound_[row];
+            if (ignore_ || gv == null) return;
 
             if (idx <= 0)
             {
@@ -578,8 +670,10 @@ namespace Cue
             }
             else
             {
-                string s = sourceNames_[idx];
-                gv.varName = s.StartsWith("probe:") ? s.Substring(6) : s;
+                string s = (idx < sourceNames_.Count) ? sourceNames_[idx] : "";
+                if (s.StartsWith("probe:")) s = s.Substring(6);
+                else if (s.StartsWith("var:")) s = s.Substring(4);
+                gv.varName = s;
                 gv.varId = -1;
             }
             Save();
@@ -842,6 +936,121 @@ namespace Cue
             foreach (BodyPartType b in BodyPartType.Values) { if (n == i) return b; ++n; }
             return BP.Hips;
         }
+
+        // ===================== LOGIC =====================
+
+        private List<Sound.LogicOp> LogicList
+        {
+            get { return Engine != null ? Engine.Logic : null; }
+        }
+
+        private void RefreshLogicList()
+        {
+            if (LogicList == null) return;
+            ignore_ = true;
+            logicList_.SetItems(LogicList);
+            ignore_ = false;
+        }
+
+        private void ShowSelectedLogic()
+        {
+            ignore_ = true;
+
+            for (int i = 0; i < 2; ++i)
+            {
+                lgvLabel_[i].Visible = false;
+                lgvSource_[i].Visible = false;
+                lgvSlider_[i].Visible = false;
+                lgvBound_[i] = null;
+            }
+            logicOp_.Visible = logicCmp_.Visible = false;
+            logicOutVar_.Visible = logicTrigName_.Visible = false;
+
+            var op = logicList_.Selected;
+            if (op != null)
+            {
+                logicEnabled_.Checked = op.enabled;
+                logicKind_.Select(op.kind);
+
+                ConfigLgv(0, "a:", op.a);
+                ConfigLgv(1, "b:", op.b);
+
+                if (op.kind == Sound.LogicKind.Assign)
+                {
+                    logicOp_.Visible = true;
+                    logicOp_.Select(op.op);
+                    logicOutVar_.Visible = true;
+                    logicOutVar_.Text = op.outVar;
+                }
+                else
+                {
+                    logicCmp_.Visible = true;
+                    logicCmp_.Select(op.cmp);
+                    logicTrigName_.Visible = true;
+                    logicTrigName_.Text = op.triggerName;
+                }
+            }
+
+            ignore_ = false;
+        }
+
+        private void ConfigLgv(int row, string label, Sound.GraphValue gv)
+        {
+            lgvBound_[row] = gv;
+            lgvLabel_[row].Text = label;
+            lgvLabel_[row].Visible = true;
+            lgvSource_[row].Visible = true;
+            RebuildSourceNames();
+            lgvSource_[row].SetItems(sourceNames_);
+            lgvSource_[row].Select(GvSourceIndex(gv));
+            lgvSlider_[row].Visible = true;
+            lgvSlider_[row].Value = gv.constant;
+        }
+
+        private void OnLgvSource(int row, int idx) { ApplyGvSource(lgvBound_[row], idx); }
+        private void OnLgvConst(int row, float f)
+        {
+            if (ignore_ || lgvBound_[row] == null) return;
+            lgvBound_[row].constant = f; Save();
+        }
+
+        private void OnLogicSelected(Sound.LogicOp o) { if (!ignore_) ShowSelectedLogic(); }
+
+        private void OnAddLogic()
+        {
+            if (LogicList == null) return;
+            LogicList.Add(new Sound.LogicOp());
+            RefreshLogicList();
+            logicList_.Select(LogicList.Count - 1);
+            ShowSelectedLogic();
+            Save();
+        }
+
+        private void OnRemoveLogic()
+        {
+            if (LogicList == null || logicList_.Selected == null) return;
+            LogicList.Remove(logicList_.Selected);
+            RefreshLogicList();
+            ShowSelectedLogic();
+            Save();
+        }
+
+        private void RelabelLogic()
+        {
+            if (LogicList == null || logicList_.Selected == null) return;
+            int idx = LogicList.IndexOf(logicList_.Selected);
+            ignore_ = true;
+            logicList_.SetItems(LogicList);
+            if (idx >= 0) logicList_.Select(idx);
+            ignore_ = false;
+        }
+
+        private void OnLogicEnabled(bool b) { if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.enabled = b; RelabelLogic(); Save(); } }
+        private void OnLogicKind(int i)     { if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.kind = i; ShowSelectedLogic(); RelabelLogic(); Save(); } }
+        private void OnLogicOp(int i)       { if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.op = i; RelabelLogic(); Save(); } }
+        private void OnLogicCmp(int i)      { if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.cmp = i; RelabelLogic(); Save(); } }
+        private void OnLogicOutVar(string s){ if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.outVar = s; RelabelLogic(); Save(); } }
+        private void OnLogicTrigName(string s){ if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.triggerName = s; RelabelLogic(); Save(); } }
 
         private void Save()
         {

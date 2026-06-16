@@ -31,6 +31,11 @@ namespace Cue.Sound
         public bool enabled = true;
         public SoundNode root = null;
 
+        // When non-empty, the patch fires on this user-defined named trigger
+        // (raised by a logic op) instead of the built-in event above. This is
+        // how you make your own triggers.
+        public string customTrigger = "";
+
         public float lastFire = -1000f;   // runtime
 
         public bool MatchesOrifice(string name_)
@@ -55,6 +60,7 @@ namespace Cue.Sound
             o.Add("orifice", new JSONData(orifice));
             o.Add("interval", new JSONData(minInterval));
             o.Add("enabled", new JSONData(enabled));
+            o.Add("customTrigger", customTrigger);
             if (root != null)
                 o.Add("root", root.ToJSON());
             return o;
@@ -86,6 +92,7 @@ namespace Cue.Sound
             J.OptInt(o, "orifice", ref p.orifice);
             J.OptFloat(o, "interval", ref p.minInterval);
             bool e = true; J.OptBool(o, "enabled", ref e); p.enabled = e;
+            p.customTrigger = J.OptString(o, "customTrigger", "");
             if (o.HasKey("root"))
                 p.root = SoundNode.FromJSON(o["root"]);
             return p;
@@ -105,6 +112,11 @@ namespace Cue.Sound
         private readonly List<SoundPatch> patches_ = new List<SoundPatch>();
         private readonly System.Random rng_;
         private readonly PhysicsProbeManager probes_;
+
+        // Named variable store: probe outputs + logic assignments live here and
+        // are read by GraphValue.varName. Shared with every running instance.
+        private readonly Dictionary<string, float> customVars_ = new Dictionary<string, float>();
+        private readonly List<LogicOp> logic_ = new List<LogicOp>();
 
         private class Running
         {
@@ -129,6 +141,8 @@ namespace Cue.Sound
         public float[] Vars { get { return vars_; } }
         public int RunningCount { get { return running_.Count; } }
         public PhysicsProbeManager Probes { get { return probes_; } }
+        public List<LogicOp> Logic { get { return logic_; } }
+        public Dictionary<string, float> CustomVars { get { return customVars_; } }
 
         // ---- signals & events --------------------------------------------
 
@@ -146,6 +160,10 @@ namespace Cue.Sound
             {
                 var p = patches_[i];
                 if (!p.enabled || p.trigger != trigger || p.root == null)
+                    continue;
+
+                // patches with a custom trigger are driven by logic, not events
+                if (!string.IsNullOrEmpty(p.customTrigger))
                     continue;
 
                 if (p.trigger == SoundRule.TriggerImpact &&
@@ -175,7 +193,7 @@ namespace Cue.Sound
             var ctx = new SoundContext
             {
                 Vars = vars_,
-                Custom = probes_.Outputs,
+                Custom = customVars_,
                 Intensity = Mathf.Clamp01(intensity),
                 Position = pos,
                 Now = elapsed_,
@@ -191,12 +209,77 @@ namespace Cue.Sound
 
         // ---- update -------------------------------------------------------
 
+        // Fires a user-defined named trigger: spawns every enabled patch whose
+        // customTrigger matches, at the person's position.
+        public void FireCustom(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return;
+
+            var pos = Sys.Vam.U.ToUnity(person_.Position);
+            for (int i = 0; i < patches_.Count; ++i)
+            {
+                var p = patches_[i];
+                if (p.enabled && p.root != null && p.customTrigger == name)
+                {
+                    if (elapsed_ - p.lastFire < p.minInterval) continue;
+                    p.lastFire = elapsed_;
+                    Spawn(p, pos, 1f);
+                }
+            }
+        }
+
+        private void UpdateLogic()
+        {
+            if (logic_.Count == 0)
+                return;
+
+            var lctx = new SoundContext
+            {
+                Vars = vars_,
+                Custom = customVars_,
+                Person = person_,
+                Rng = rng_,
+                Now = elapsed_
+            };
+
+            for (int i = 0; i < logic_.Count; ++i)
+            {
+                var op = logic_[i];
+                if (!op.enabled)
+                    continue;
+
+                float a = op.a.Get(lctx);
+                float b = op.b.Get(lctx);
+
+                if (op.kind == LogicKind.Assign)
+                {
+                    if (!string.IsNullOrEmpty(op.outVar))
+                        customVars_[op.outVar] = MathOp.Apply(op.op, a, b);
+                }
+                else // Trigger (rising edge)
+                {
+                    bool cond = CmpOp.Apply(op.cmp, a, b);
+                    if (cond && !op.lastCond)
+                        FireCustom(op.triggerName);
+                    op.lastCond = cond;
+                }
+            }
+        }
+
         public void Update(float s)
         {
             elapsed_ += s;
 
             probes_.Update(s);
+
+            // publish probe outputs into the shared variable store, then run the
+            // logic layer (which may add/overwrite variables and fire triggers)
+            foreach (var kv in probes_.Outputs)
+                customVars_[kv.Key] = kv.Value;
+
             RefreshSignals();
+            UpdateLogic();
 
             if (!startedAlways_)
             {
@@ -296,6 +379,12 @@ namespace Cue.Sound
                 a.Add(patches_[i].ToJSON());
             o.Add("patches", a);
             o.Add("probes", probes_.ToJSON());
+
+            var la = new JSONArray();
+            for (int i = 0; i < logic_.Count; ++i)
+                la.Add(logic_[i].ToJSON());
+            o.Add("logic", la);
+
             return o;
         }
 
@@ -320,6 +409,20 @@ namespace Cue.Sound
 
             if (o.HasKey("probes"))
                 probes_.Load(o["probes"].AsObject);
+
+            logic_.Clear();
+            if (o.HasKey("logic"))
+            {
+                var la = o["logic"].AsArray;
+                if (la != null)
+                {
+                    foreach (JSONNode n in la)
+                    {
+                        var l = LogicOp.FromJSON(n.AsObject);
+                        if (l != null) logic_.Add(l);
+                    }
+                }
+            }
         }
     }
 }

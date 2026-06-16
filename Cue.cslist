@@ -10,6 +10,7 @@ project\src\Sound\SoundEvents.cs
 project\src\Sound\GraphCore.cs
 project\src\Sound\GraphNodes.cs
 project\src\Sound\GraphEngine.cs
+project\src\Sound\GraphLogic.cs
 project\src\Sound\PhysicsProbes.cs
 project\src\Integration\FoostPlugins.cs
 project\src\UI\ScriptUI\SoundTab.cs
