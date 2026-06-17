@@ -69,6 +69,11 @@ namespace Cue
         // math node
         private VUI.ComboBox<string> mathOp_, mathTarget_;
 
+        // conditional sub-panels (toggled whole, so their labels hide too)
+        private VUI.Panel clipPanel_, envPanel_, mathPanel_;
+        private VUI.Panel[] gvRowPanel_ = new VUI.Panel[GvRows];
+        private VUI.Panel logicOutPanel_, logicRatePanel_, logicEnvPanel_;
+
         // ---- probes
         private VUI.ComboBox<Sound.PhysicsProbe> probes_;
         private VUI.ComboBox<string> probeAddType_;
@@ -268,6 +273,7 @@ namespace Cue
             clipSet_ = n2.Add(new VUI.ComboBox<string>(new string[] { "" }, OnClipSet));
             clipSet_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
             clipLoop_ = n2.Add(new VUI.CheckBox("Loop", OnClipLoop));
+            clipPanel_ = n2;
             patchGroup_.Add(n2);
 
             for (int i = 0; i < GvRows; ++i)
@@ -278,6 +284,7 @@ namespace Cue
                 gvSource_[k] = row.Add(new VUI.ComboBox<string>(new string[] { "(constant)" }, (idx) => OnGvSource(k, idx)));
                 gvSource_[k].MinimumSize = new VUI.Size(160, VUI.Widget.DontCare);
                 gvSlider_[k] = row.Add(new VUI.FloatTextSlider(1f, 0f, 2f, (f) => OnGvConst(k, f)));
+                gvRowPanel_[k] = row;
                 patchGroup_.Add(row);
             }
 
@@ -286,6 +293,7 @@ namespace Cue
             envAttack_  = ne.Add(new VUI.FloatTextSlider(0.02f, 0f, 3f, OnEnvAttack));
             envHold_    = ne.Add(new VUI.FloatTextSlider(0f, 0f, 10f, OnEnvHold));
             envRelease_ = ne.Add(new VUI.FloatTextSlider(0.1f, 0f, 5f, OnEnvRelease));
+            envPanel_ = ne;
             patchGroup_.Add(ne);
 
             var nm = new VUI.Panel(new VUI.HorizontalFlow(6));
@@ -295,6 +303,7 @@ namespace Cue
             nm.Add(new VUI.Label("Modulates:"));
             mathTarget_ = nm.Add(new VUI.ComboBox<string>(Sound.MathTarget.Names, OnMathTarget));
             mathTarget_.MinimumSize = new VUI.Size(100, VUI.Widget.DontCare);
+            mathPanel_ = nm;
             patchGroup_.Add(nm);
 
         }
@@ -365,11 +374,13 @@ namespace Cue
             l4.Add(new VUI.Label("Trigger:"));
             logicTrigName_ = l4.Add(new VUI.TextBox("", "trigger name", OnLogicTrigName));
             logicTrigName_.MinimumSize = new VUI.Size(140, VUI.Widget.DontCare);
+            logicOutPanel_ = l4;
             logicGroup_.Add(l4);
 
             var lr = new VUI.Panel(new VUI.HorizontalFlow(6));
             lr.Add(new VUI.Label("Rate:"));
             logicRate_ = lr.Add(new VUI.FloatTextSlider(5f, 0f, 50f, OnLogicRate));
+            logicRatePanel_ = lr;
             logicGroup_.Add(lr);
 
             var lenv = new VUI.Panel(new VUI.HorizontalFlow(6));
@@ -377,6 +388,7 @@ namespace Cue
             logicEnvA_ = lenv.Add(new VUI.FloatTextSlider(0.05f, 0f, 3f, OnLogicEnvA));
             logicEnvH_ = lenv.Add(new VUI.FloatTextSlider(0f, 0f, 10f, OnLogicEnvH));
             logicEnvR_ = lenv.Add(new VUI.FloatTextSlider(0.3f, 0f, 5f, OnLogicEnvR));
+            logicEnvPanel_ = lenv;
             logicGroup_.Add(lenv);
         }
 
@@ -599,18 +611,15 @@ namespace Cue
         {
             ignore_ = true;
 
-            // hide everything by default
-            clipSet_.Visible = false;
-            clipLoop_.Visible = false;
+            // hide whole panels by default (so their labels hide too)
+            clipPanel_.Visible = false;
             for (int i = 0; i < GvRows; ++i)
             {
-                gvLabel_[i].Visible = false;
-                gvSource_[i].Visible = false;
-                gvSlider_[i].Visible = false;
+                gvRowPanel_[i].Visible = false;
                 gvBound_[i] = null;
             }
-            envAttack_.Visible = envHold_.Visible = envRelease_.Visible = false;
-            mathOp_.Visible = mathTarget_.Visible = false;
+            envPanel_.Visible = false;
+            mathPanel_.Visible = false;
 
             var nr = CurrentNodeRef();
             if (nr == null) { nodeTypeLabel_.Text = "node: (none)"; ignore_ = false; return; }
@@ -627,10 +636,9 @@ namespace Cue
 
             if (clip != null)
             {
-                clipSet_.Visible = true;
+                clipPanel_.Visible = true;
                 clipSet_.SetItems(SetNames());
                 clipSet_.Select(SetIndex(clip.set));
-                clipLoop_.Visible = true;
                 clipLoop_.Checked = clip.loop;
 
                 ConfigGv(0, "intensity:", clip.intensity, 0f, 1f);
@@ -651,7 +659,7 @@ namespace Cue
             }
             else if (env != null)
             {
-                envAttack_.Visible = envHold_.Visible = envRelease_.Visible = true;
+                envPanel_.Visible = true;
                 envAttack_.Value = env.attack;
                 envHold_.Value = env.hold;
                 envRelease_.Value = env.release;
@@ -660,9 +668,8 @@ namespace Cue
             {
                 ConfigGv(0, "a:", math.a, -2f, 2f);
                 ConfigGv(1, "b:", math.b, -2f, 2f);
-                mathOp_.Visible = true;
+                mathPanel_.Visible = true;
                 mathOp_.Select(math.op);
-                mathTarget_.Visible = true;
                 mathTarget_.Select(math.target);
             }
 
@@ -672,14 +679,11 @@ namespace Cue
         private void ConfigGv(int row, string label, Sound.GraphValue gv, float min, float max)
         {
             gvBound_[row] = gv;
-            gvLabel_[row].Text = label;
-            gvLabel_[row].Visible = true;
+            gvRowPanel_[row].Visible = true;   // shows the whole row (label included)
 
-            gvSource_[row].Visible = true;
+            gvLabel_[row].Text = label;
             gvSource_[row].SetItems(sourceNames_);
             gvSource_[row].Select(GvSourceIndex(gv));
-
-            gvSlider_[row].Visible = true;
             gvSlider_[row].Minimum = min;
             gvSlider_[row].Maximum = max;
             gvSlider_[row].Value = gv.constant;
@@ -1038,20 +1042,20 @@ namespace Cue
         {
             ignore_ = true;
 
-            logicFormula_.Visible = false;
-            logicOutVar_.Visible = logicTrigName_.Visible = false;
-            logicRate_.Visible = false;
-            logicEnvA_.Visible = logicEnvH_.Visible = logicEnvR_.Visible = false;
+            logicOutPanel_.Visible = false;
+            logicRatePanel_.Visible = false;
+            logicEnvPanel_.Visible = false;
+            logicTrigName_.Visible = false;
+            logicOutVar_.Visible = false;
 
             var op = logicList_.Selected;
             if (op != null)
             {
                 logicEnabled_.Checked = op.enabled;
                 logicKind_.Select(op.kind);
-
-                logicFormula_.Visible = true;
                 logicFormula_.Text = op.formula;
 
+                logicOutPanel_.Visible = true;
                 if (op.kind == Sound.LogicKind.Trigger)
                 {
                     logicTrigName_.Visible = true;
@@ -1065,13 +1069,13 @@ namespace Cue
 
                 if (op.kind == Sound.LogicKind.Slew || op.kind == Sound.LogicKind.Smooth)
                 {
-                    logicRate_.Visible = true;
+                    logicRatePanel_.Visible = true;
                     logicRate_.Value = op.rate;
                 }
 
                 if (op.kind == Sound.LogicKind.Envelope)
                 {
-                    logicEnvA_.Visible = logicEnvH_.Visible = logicEnvR_.Visible = true;
+                    logicEnvPanel_.Visible = true;
                     logicEnvA_.Value = op.attack;
                     logicEnvH_.Value = op.hold;
                     logicEnvR_.Value = op.release;
