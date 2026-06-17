@@ -521,6 +521,9 @@ namespace VUI
 		private string placeholder_ = "";
 		private CustomInputField input_ = null;
 		private bool multiline_ = false;
+		private Text overlay_ = null;
+		private Text mainText_ = null;
+		private System.Func<string, string> highlighter_ = null;
 		private bool ignore_ = false;
 		private bool ignoreAc_ = false;
 		private int focusflags_ = Root.FocusDefault;
@@ -562,6 +565,16 @@ namespace VUI
 						? CustomInputField.LineType.MultiLineNewline
 						: CustomInputField.LineType.SingleLine;
 			}
+		}
+
+		// When set (before the widget is created), the editable text is made
+		// transparent and a rich-text overlay shows highlighter(rawText) in its
+		// place. The caret stays visible via customCaretColor. Set this right
+		// after construction, before layout builds the GameObjects.
+		public System.Func<string, string> Highlighter
+		{
+			get { return highlighter_; }
+			set { highlighter_ = value; }
 		}
 
 		public string Text
@@ -657,6 +670,10 @@ namespace VUI
 			// top-left for a multiline editor, vertically centred for single line
 			text.alignment = multiline_ ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
 
+			// keep a handle to the editable text component (the local `text` is
+			// reused below for the placeholder)
+			var mainText = text;
+
 			input_ = field.AddComponent<CustomInputField>();
 			input_.PointerDown += OnMouseDown;
 			input_.Focused += OnFocused;
@@ -693,8 +710,47 @@ namespace VUI
 			input_.placeholder = text;
 			input_.placeholder.GetComponent<Text>().text = placeholder_;
 
+			if (highlighter_ != null)
+				BuildHighlightOverlay(field, mainText);
+
 			Style.Setup(this);
 			UpdateTextRect();
+		}
+
+		// Builds a rich-text Text that sits exactly over the editable text and
+		// renders the colorized source. The editable text itself is made
+		// transparent (caret kept visible), so the user sees only the colored
+		// overlay while still editing the real field. Colour tags are zero-width,
+		// so the overlay lays out identically to the raw text.
+		private void BuildHighlightOverlay(GameObject field, Text mainText)
+		{
+			mainText_ = mainText;
+
+			var go = new GameObject("TextBoxHighlight");
+			go.transform.SetParent(field.transform, false);
+
+			overlay_ = go.AddComponent<Text>();
+			overlay_.font = mainText.font;
+			overlay_.fontSize = mainText.fontSize;
+			overlay_.alignment = mainText.alignment;
+			overlay_.horizontalOverflow = mainText.horizontalOverflow;
+			overlay_.verticalOverflow = VerticalWrapMode.Overflow;
+			overlay_.supportRichText = true;
+			overlay_.raycastTarget = false;
+			overlay_.color = Color.white;   // tags drive the actual colours
+
+			var rt = overlay_.rectTransform;
+			rt.anchorMin = new Vector2(0, 0);
+			rt.anchorMax = new Vector2(1, 1);
+			rt.offsetMin = Vector2.zero;
+			rt.offsetMax = Vector2.zero;
+
+			// hide the editable glyphs but keep the caret visible
+			mainText.color = new Color(1, 1, 1, 0);
+			input_.customCaretColor = true;
+			input_.caretColor = Style.Theme.TextColor;
+
+			overlay_.text = highlighter_(text_ ?? "");
 		}
 
 		private void UpdateTextRect()
@@ -720,6 +776,19 @@ namespace VUI
 		{
 			base.DoPolish();
 			Style.Polish(this);
+
+			// Style.Polish re-applies the editable text colour every pass; when a
+			// highlight overlay is active, keep the real text transparent (caret
+			// stays visible) so only the colourized overlay shows.
+			if (overlay_ != null && mainText_ != null)
+			{
+				mainText_.color = new Color(1, 1, 1, 0);
+				if (input_ != null)
+				{
+					input_.customCaretColor = true;
+					input_.caretColor = Style.Theme.TextColor;
+				}
+			}
 		}
 
 		protected override Size DoGetPreferredSize(
@@ -841,6 +910,9 @@ namespace VUI
 
 		private void OnValueChanged(string s)
 		{
+			if (overlay_ != null && highlighter_ != null)
+				overlay_.text = highlighter_(s ?? "");
+
 			if (Validate != null)
 				return;
 

@@ -180,6 +180,7 @@ namespace Cue
 
             scriptSource_ = scriptGroup_.Add(new VUI.TextBox("", "code...", OnScriptSource));
             scriptSource_.Multiline = true;
+            scriptSource_.Highlighter = Sound.Highlight.Colorize;
             scriptSource_.MinimumSize = new VUI.Size(470, 230);
         }
 

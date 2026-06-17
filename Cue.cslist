@@ -10,6 +10,7 @@ project\src\Sound\SoundEvents.cs
 project\src\Sound\Expr.cs
 project\src\Sound\Script.cs
 project\src\Sound\ScriptCompiler.cs
+project\src\Sound\CuneHighlight.cs
 project\src\Sound\ScriptHost.cs
 project\src\Sound\AssetManager.cs
 project\src\Sound\GraphCore.cs
