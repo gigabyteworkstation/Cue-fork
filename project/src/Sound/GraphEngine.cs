@@ -111,12 +111,10 @@ namespace Cue.Sound
         private readonly float[] vars_ = new float[GVar.TableCount];
         private readonly List<SoundPatch> patches_ = new List<SoundPatch>();
         private readonly System.Random rng_;
-        private readonly PhysicsProbeManager probes_;
 
-        // Named variable store: probe outputs + logic assignments live here and
-        // are read by GraphValue.varName. Shared with every running instance.
+        // Named variable store: scripts write it ($name = ...) and it is read by
+        // GraphValue.varName. Shared with every running instance.
         private readonly Dictionary<string, float> customVars_ = new Dictionary<string, float>();
-        private readonly List<LogicOp> logic_ = new List<LogicOp>();
         private readonly List<Script> scripts_ = new List<Script>();
 
         private class Running
@@ -134,15 +132,12 @@ namespace Cue.Sound
         {
             person_ = p;
             rng_ = new System.Random(System.Guid.NewGuid().GetHashCode());
-            probes_ = new PhysicsProbeManager(p);
             CreateDefaultPatches();
         }
 
         public List<SoundPatch> Patches { get { return patches_; } }
         public float[] Vars { get { return vars_; } }
         public int RunningCount { get { return running_.Count; } }
-        public PhysicsProbeManager Probes { get { return probes_; } }
-        public List<LogicOp> Logic { get { return logic_; } }
         public List<Script> Scripts { get { return scripts_; } }
         public Dictionary<string, float> CustomVars { get { return customVars_; } }
 
@@ -239,25 +234,6 @@ namespace Cue.Sound
 
         private readonly SoundContext logicCtx_ = new SoundContext();
 
-        private void UpdateLogic(float dt)
-        {
-            if (logic_.Count == 0)
-                return;
-
-            logicCtx_.Vars = vars_;
-            logicCtx_.Custom = customVars_;
-            logicCtx_.Person = person_;
-            logicCtx_.Rng = rng_;
-            logicCtx_.Now = elapsed_;
-
-            for (int i = 0; i < logic_.Count; ++i)
-            {
-                var op = logic_[i];
-                if (op.enabled)
-                    op.Eval(logicCtx_, dt, customVars_, FireCustom);
-            }
-        }
-
         // Resolves `import "name"` to a sibling script's source (cached delegate
         // so it's assigned without allocation each frame).
         private Func<string, string> importResolver_ = null;
@@ -324,15 +300,7 @@ namespace Cue.Sound
         {
             elapsed_ += s;
 
-            probes_.Update(s);
-
-            // publish probe outputs into the shared variable store, then run the
-            // logic layer (which may add/overwrite variables and fire triggers)
-            foreach (var kv in probes_.Outputs)
-                customVars_[kv.Key] = kv.Value;
-
             RefreshSignals();
-            UpdateLogic(s);
             RunScripts(s);
 
             if (!startedAlways_)
@@ -432,12 +400,6 @@ namespace Cue.Sound
             for (int i = 0; i < patches_.Count; ++i)
                 a.Add(patches_[i].ToJSON());
             o.Add("patches", a);
-            o.Add("probes", probes_.ToJSON());
-
-            var la = new JSONArray();
-            for (int i = 0; i < logic_.Count; ++i)
-                la.Add(logic_[i].ToJSON());
-            o.Add("logic", la);
 
             var sa = new JSONArray();
             for (int i = 0; i < scripts_.Count; ++i)
@@ -463,23 +425,6 @@ namespace Cue.Sound
                     var p = SoundPatch.FromJSON(n.AsObject);
                     if (p != null)
                         patches_.Add(p);
-                }
-            }
-
-            if (o.HasKey("probes"))
-                probes_.Load(o["probes"].AsObject);
-
-            logic_.Clear();
-            if (o.HasKey("logic"))
-            {
-                var la = o["logic"].AsArray;
-                if (la != null)
-                {
-                    foreach (JSONNode n in la)
-                    {
-                        var l = LogicOp.FromJSON(n.AsObject);
-                        if (l != null) logic_.Add(l);
-                    }
                 }
             }
 
