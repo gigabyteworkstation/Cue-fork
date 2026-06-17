@@ -520,6 +520,7 @@ namespace VUI
 		private string oldText_ = null;
 		private string placeholder_ = "";
 		private CustomInputField input_ = null;
+		private bool multiline_ = false;
 		private bool ignore_ = false;
 		private bool ignoreAc_ = false;
 		private int focusflags_ = Root.FocusDefault;
@@ -546,6 +547,21 @@ namespace VUI
 		public CustomInputField InputField
 		{
 			get { return input_; }
+		}
+
+		// Multiline editing. Safe to set before the widget is created: the value
+		// is applied when the input field is built (and live if it already is).
+		public bool Multiline
+		{
+			get { return multiline_; }
+			set
+			{
+				multiline_ = value;
+				if (input_ != null)
+					input_.lineType = value
+						? CustomInputField.LineType.MultiLineNewline
+						: CustomInputField.LineType.SingleLine;
+			}
 		}
 
 		public string Text
@@ -651,7 +667,9 @@ namespace VUI
 			input_.text = text_;
 			input_.onEndEdit.AddListener(OnEdited);
 			input_.onValueChanged.AddListener(OnValueChanged);
-			input_.lineType = CustomInputField.LineType.SingleLine;
+			input_.lineType = multiline_
+				? CustomInputField.LineType.MultiLineNewline
+				: CustomInputField.LineType.SingleLine;
 
 			var image = WidgetObject.AddComponent<UnityEngine.UI.Image>();
 			image.raycastTarget = false;

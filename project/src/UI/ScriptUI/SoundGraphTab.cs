@@ -247,7 +247,7 @@ namespace Cue
             scriptInfo_ = scriptGroup_.Add(new VUI.Label("--"));
 
             scriptSource_ = scriptGroup_.Add(new VUI.TextBox("", "code...", OnScriptSource));
-            scriptSource_.InputField.lineType = VUI.CustomInputField.LineType.MultiLineNewline;
+            scriptSource_.Multiline = true;
             scriptSource_.MinimumSize = new VUI.Size(470, 230);
         }
 
