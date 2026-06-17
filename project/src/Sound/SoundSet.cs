@@ -528,6 +528,8 @@ namespace Cue.Sound
 
         public void Update(float s)
         {
+            AssetManager.Instance.Update();
+
             for (int i = 0; i < sets_.Count; ++i)
                 sets_[i].Update();
         }
@@ -535,7 +537,10 @@ namespace Cue.Sound
         public void OnPluginState(bool enabled)
         {
             if (!enabled)
+            {
                 player_.StopAll();
+                AssetManager.Instance.Clear();
+            }
         }
 
         public JSONClass ToJSON()

@@ -50,6 +50,16 @@ namespace Cue.Sound
             Reg("playat", "s f f f f f", PlayAt,
                 "playat(set, intensity, x, y, z, ...) at a world point");
 
+            // --- asset manager (cached loading) ---------------------------
+            Reg("loadclip", "s", LoadClip,
+                "loadclip(\"file\") -> caches an audio file, 1 when ready");
+            Reg("loadbundle", "s", LoadBundle,
+                "loadbundle(\"file\") -> caches an assetbundle, 1 when ready");
+            Reg("playfile", "s f f", PlayFile,
+                "playfile(\"file\", vol=1, pitch=1) plays a cached audio file");
+            Reg("playbundle", "s s f f", PlayBundle,
+                "playbundle(\"bundle\", \"clip\", vol=1, pitch=1) plays a bundle clip");
+
             // --- value table ----------------------------------------------
             Reg("get", "s", GetVar, "get(\"name\") -> shared table / signal value");
             Reg("set", "s f", SetVar, "set(\"name\", value) writes the shared table");
@@ -140,6 +150,48 @@ namespace Cue.Sound
             bool ok = SoundManager.Instance.Play(
                 set, pos, Mathf.Clamp01(intensity),
                 vol, pitch, 0f, 0f, 0f);
+            return ok ? 1f : 0f;
+        }
+
+        private static float LoadClip(Args a)
+        {
+            return AssetManager.Instance.GetClip(a.S(0)) != null ? 1f : 0f;
+        }
+
+        private static float LoadBundle(Args a)
+        {
+            string path = a.S(0);
+            AssetManager.Instance.LoadBundle(path);
+            return AssetManager.Instance.BundleReady(path) ? 1f : 0f;
+        }
+
+        private static float PlayFile(Args a)
+        {
+            var ctx = a.ctx;
+            if (ctx == null || ctx.Person == null) return 0f;
+            var clip = AssetManager.Instance.GetClip(a.S(0));
+            if (clip == null) return 0f;
+            var pos = Sys.Vam.U.ToUnity(ctx.Person.Position);
+            return PlayClip(clip, a.F(0, 1f), a.F(1, 1f), pos);
+        }
+
+        private static float PlayBundle(Args a)
+        {
+            var ctx = a.ctx;
+            if (ctx == null || ctx.Person == null) return 0f;
+            var clip = AssetManager.Instance.GetBundleClip(a.S(0), a.S(1));
+            if (clip == null) return 0f;
+            var pos = Sys.Vam.U.ToUnity(ctx.Person.Position);
+            return PlayClip(clip, a.F(0, 1f), a.F(1, 1f), pos);
+        }
+
+        private static float PlayClip(AudioClip clip, float vol, float pitch, UnityEngine.Vector3 pos)
+        {
+            if (clip == null) return 0f;
+            if (vol <= 0f) vol = 1f;
+            if (pitch <= 0f) pitch = 1f;
+            bool ok = SoundManager.Instance.Player.Play(
+                clip, pos, Mathf.Clamp(vol * SoundManager.Instance.MasterVolume, 0f, 2f), pitch);
             return ok ? 1f : 0f;
         }
 
