@@ -654,7 +654,8 @@ namespace VUI
 			text.color = Style.Theme.TextColor;
 			text.fontSize = Style.Theme.DefaultFontSize;
 			text.font = Style.Theme.DefaultFont;
-			text.alignment = TextAnchor.MiddleLeft;
+			// top-left for a multiline editor, vertically centred for single line
+			text.alignment = multiline_ ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
 
 			input_ = field.AddComponent<CustomInputField>();
 			input_.PointerDown += OnMouseDown;
