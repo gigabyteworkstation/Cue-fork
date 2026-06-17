@@ -10,16 +10,24 @@ namespace Cue.Sound
     {
         // token types (no enums)
         private const int T_NUM = 0, T_IDENT = 1, T_VAR = 2, T_KW = 3, T_OP = 4,
-                          T_LP = 5, T_RP = 6, T_LB = 7, T_RB = 8, T_COMMA = 9, T_EOF = 10;
+                          T_LP = 5, T_RP = 6, T_LB = 7, T_RB = 8, T_COMMA = 9,
+                          T_EOF = 10, T_STR = 11;
 
         private struct Tok { public int t; public string s; public float n; }
 
         public static ScriptProgram Compile(string src)
         {
+            return Compile(src, null);
+        }
+
+        // resolver maps an imported name -> that script's source text (or null).
+        public static ScriptProgram Compile(string src, Func<string, string> resolver)
+        {
             var p = new ScriptProgram();
             try
             {
-                var c = new Ctx(src);
+                string full = Preprocess(src, resolver, new HashSet<string>());
+                var c = new Ctx(full);
                 c.ParseAll(p);
             }
             catch (Exception e)
@@ -27,6 +35,50 @@ namespace Cue.Sound
                 p.error = e.Message;
             }
             return p;
+        }
+
+        // Handles `import "name"` at the top of a script by splicing in the
+        // imported source ahead of the importer. Cycle-guarded; a missing import
+        // is reported as a compile error rather than silently skipped.
+        private static string Preprocess(string src, Func<string, string> resolver, HashSet<string> seen)
+        {
+            if (string.IsNullOrEmpty(src) || src.IndexOf("import") < 0)
+                return src;
+
+            var sb = new System.Text.StringBuilder();
+            var lines = src.Split('\n');
+            for (int i = 0; i < lines.Length; ++i)
+            {
+                string line = lines[i];
+                string t = line.Trim();
+                if (t.StartsWith("import"))
+                {
+                    string name = ExtractImportName(t);
+                    if (name == null)
+                        throw new Exception("import expects a quoted name");
+                    if (seen.Contains(name))
+                        continue;                 // already pulled in / cycle
+                    seen.Add(name);
+                    string dep = (resolver != null) ? resolver(name) : null;
+                    if (dep == null)
+                        throw new Exception("cannot import '" + name + "'");
+                    sb.Append(Preprocess(dep, resolver, seen));
+                    sb.Append('\n');
+                    continue;
+                }
+                sb.Append(line);
+                sb.Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        private static string ExtractImportName(string line)
+        {
+            int a = line.IndexOf('"');
+            if (a < 0) return null;
+            int b = line.IndexOf('"', a + 1);
+            if (b <= a) return null;
+            return line.Substring(a + 1, b - a - 1);
         }
 
         private static bool IsKeyword(string s)
@@ -72,6 +124,26 @@ namespace Cue.Sound
                     int st = i;
                     while (i < n && (char.IsLetterOrDigit(s[i]) || s[i] == '_' || s[i] == '.')) i++;
                     toks.Add(new Tok { t = T_VAR, s = s.Substring(st, i - st) });
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    i++;
+                    var sb = new System.Text.StringBuilder();
+                    while (i < n && s[i] != '"')
+                    {
+                        if (s[i] == '\\' && i + 1 < n)
+                        {
+                            char e = s[i + 1];
+                            sb.Append(e == 'n' ? '\n' : e == 't' ? '\t' : e);
+                            i += 2;
+                        }
+                        else sb.Append(s[i++]);
+                    }
+                    if (i >= n) throw new Exception("unterminated string");
+                    i++;   // closing quote
+                    toks.Add(new Tok { t = T_STR, s = sb.ToString() });
                     continue;
                 }
 
@@ -126,6 +198,7 @@ namespace Cue.Sound
             private List<int> code_;                    // current target segment
             private readonly List<float> consts_ = new List<float>();
             private readonly List<string> names_ = new List<string>();
+            private readonly List<string> strs_ = new List<string>();
             private readonly Dictionary<string, int> locals_ = new Dictionary<string, int>();
 
             public Ctx(string src) { tk_ = Lex(src); pos_ = 0; }
@@ -150,6 +223,11 @@ namespace Cue.Sound
             {
                 for (int i = 0; i < names_.Count; ++i) if (names_[i] == s) return i;
                 names_.Add(s); return names_.Count - 1;
+            }
+            private int StrIdx(string s)
+            {
+                for (int i = 0; i < strs_.Count; ++i) if (strs_[i] == s) return i;
+                strs_.Add(s); return strs_.Count - 1;
             }
             private int Local(string s)
             {
@@ -196,6 +274,7 @@ namespace Cue.Sound
 
                 prog.consts = consts_.ToArray();
                 prog.names = names_.ToArray();
+                prog.strs = strs_.ToArray();
                 prog.numVars = locals_.Count;
                 for (int h = 0; h < Hook.Count; ++h)
                 {
@@ -388,17 +467,28 @@ namespace Cue.Sound
                     if (Cur.t == T_LP)   // function call
                     {
                         int fn = Builtins.Find(id);
-                        if (fn < 0) throw new Exception("unknown function '" + id + "'");
-                        pos_++;
-                        int argc = 0;
-                        if (Cur.t != T_RP)
+                        if (fn >= 0)
                         {
-                            Expr(); argc++;
-                            while (Cur.t == T_COMMA) { pos_++; Expr(); argc++; }
+                            pos_++;
+                            int argc = 0;
+                            if (Cur.t != T_RP)
+                            {
+                                Expr(); argc++;
+                                while (Cur.t == T_COMMA) { pos_++; Expr(); argc++; }
+                            }
+                            Expect(T_RP, "')'");
+                            code_.Add(Op.CALL); code_.Add(fn); code_.Add(argc);
+                            return;
                         }
-                        Expect(T_RP, "')'");
-                        code_.Add(Op.CALL); code_.Add(fn); code_.Add(argc);
-                        return;
+
+                        int hid = Host.Find(id);
+                        if (hid >= 0)
+                        {
+                            HostCall(id, hid);
+                            return;
+                        }
+
+                        throw new Exception("unknown function '" + id + "'");
                     }
 
                     E(Op.LOADL, Local(id));   // local variable read
@@ -406,6 +496,46 @@ namespace Cue.Sound
                 }
 
                 throw new Exception("unexpected token in expression");
+            }
+
+            // host call: parse args against the function's typed signature.
+            // string args (a leading prefix) come from string literals -> PUSHS;
+            // float args are full expressions. Trailing floats are optional.
+            private void HostCall(string name, int hid)
+            {
+                pos_++;   // '('
+                int sargc = 0, fargc = 0, argi = 0;
+
+                if (Cur.t != T_RP)
+                {
+                    for (;;)
+                    {
+                        int kind = Host.KindAt(hid, argi);
+                        if (kind == Host.KString)
+                        {
+                            if (Cur.t != T_STR)
+                                throw new Exception("argument " + (argi + 1) + " of " + name + " must be a \"string\"");
+                            E(Op.PUSHS, StrIdx(Next().s));
+                            sargc++;
+                        }
+                        else
+                        {
+                            Expr();
+                            fargc++;
+                        }
+                        argi++;
+
+                        if (Cur.t == T_COMMA) { pos_++; continue; }
+                        break;
+                    }
+                }
+
+                Expect(T_RP, "')'");
+
+                if (sargc < Host.ReqStrings(hid))
+                    throw new Exception(name + " is missing a required \"string\" argument");
+
+                code_.Add(Op.HCALL); code_.Add(hid); code_.Add(fargc); code_.Add(sargc);
             }
         }
     }

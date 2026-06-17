@@ -31,10 +31,22 @@ namespace Cue.Sound
         public const int SETV   = 4;   // table[names[a]] = pop
         public const int FIRE   = 5;   // fire(names[a])
         public const int CALL   = 6;   // builtin a, argc b -> push result
+        public const int PUSHS  = 7;   // push strs[a] onto the string stack
+        public const int HCALL  = 8;   // host fn a, fargc b, sargc c -> push float result
         public const int ADD = 10, SUB = 11, MUL = 12, DIV = 13, MOD = 14, POW = 15, NEG = 16;
         public const int LT = 20, GT = 21, LE = 22, GE = 23, EQ = 24, NE = 25, AND = 26, OR = 27, NOT = 28;
         public const int JMP = 30, JZ = 31;   // jump / jump-if-zero to addr a
         public const int POP = 40, HALT = 41;
+    }
+
+    // The language's identity. Scripts are authored as text and saved as
+    // ".cune" files (Cuneiform: the oldest writing system, and it contains
+    // "Cue"). One place to rename it all.
+    public static class CuneLang
+    {
+        public const string Name      = "Cuneiform";
+        public const string Short     = "Cune";
+        public const string Extension = "cune";   // *.cune
     }
 
     public static class Hook
@@ -53,6 +65,7 @@ namespace Cue.Sound
     {
         public float[] consts = new float[0];
         public string[] names = new string[0];
+        public string[] strs = new string[0];   // string literal pool (host args)
         public int numVars = 0;
         public int[][] code = new int[Hook.Count][];  // per-hook bytecode
         public string error = null;
@@ -78,15 +91,43 @@ namespace Cue.Sound
         public int lastInstr = 0;        // opcodes executed last frame
         public int totalVars = 0;        // variable slots (memory)
         public float lastMicros = 0f;    // last run time
+        public int memBytes = 0;         // estimated steady-state footprint
+
+        // Resolves `import "name"` to another script's source. Set by the engine
+        // before compiling so scripts can pull in shared libraries / globals.
+        public Func<string, string> Imports = null;
 
         public string Error { get { return (prog_ != null) ? prog_.error : null; } }
 
         public void Compile()
         {
-            prog_ = Compiler.Compile(source);
+            prog_ = Compiler.Compile(source, Imports);
             compiledFrom_ = source;
             vars_ = new float[Mathf.Max(1, prog_.numVars)];
             totalVars = prog_.numVars;
+            memBytes = EstimateBytes();
+        }
+
+        // Rough but honest steady-state memory: the pools + all code segments +
+        // the persistent variable arena (the shared 256-float VM stack is not
+        // counted here since it's one ThreadStatic buffer shared by every script).
+        private int EstimateBytes()
+        {
+            if (prog_ == null) return 0;
+
+            int b = 0;
+            b += prog_.consts.Length * 4;
+            b += vars_.Length * 4;
+
+            for (int i = 0; i < prog_.names.Length; ++i)
+                b += 16 + (prog_.names[i] != null ? prog_.names[i].Length * 2 : 0);
+            for (int i = 0; i < prog_.strs.Length; ++i)
+                b += 16 + (prog_.strs[i] != null ? prog_.strs[i].Length * 2 : 0);
+
+            for (int h = 0; h < Hook.Count; ++h)
+                if (prog_.code[h] != null) b += prog_.code[h].Length * 4;
+
+            return b;
         }
 
         public void RunHook(int hook, SoundContext ctx, Dictionary<string, float> table, Action<string> fire)
@@ -133,13 +174,18 @@ namespace Cue.Sound
     public static class VM
     {
         private const int StackSize = 256;
+        private const int StrStackSize = 64;
         [ThreadStatic] private static float[] stack_;
+        [ThreadStatic] private static string[] sstack_;
 
         public static int Run(ScriptProgram p, int[] code, float[] vars,
             SoundContext ctx, Dictionary<string, float> table, Action<string> fire)
         {
             if (stack_ == null) stack_ = new float[StackSize];
+            if (sstack_ == null) sstack_ = new string[StrStackSize];
             var st = stack_;
+            var ss = sstack_;
+            int ssp = 0;
             int sp = 0;
             int ip = 0;
             int instr = 0;
@@ -161,6 +207,20 @@ namespace Cue.Sound
                     case Op.SETV:   { string nm = p.names[code[ip++]]; if (table != null) table[nm] = st[--sp]; else sp--; break; }
                     case Op.FIRE:   { string nm = p.names[code[ip++]]; if (fire != null) fire(nm); break; }
                     case Op.CALL:   { int f = code[ip++]; int argc = code[ip++]; sp = CallBuiltin(f, st, sp, argc); break; }
+                    case Op.PUSHS:  { if (ssp < StrStackSize) ss[ssp++] = p.strs[code[ip++]]; else ip++; break; }
+                    case Op.HCALL:
+                    {
+                        int f = code[ip++], fargc = code[ip++], sargc = code[ip++];
+                        sp  -= fargc; if (sp  < 0) sp  = 0;
+                        ssp -= sargc; if (ssp < 0) ssp = 0;
+                        var ha = new Host.Args {
+                            s = ss, sb = ssp, sn = sargc,
+                            f = st, fb = sp,  fn = fargc,
+                            ctx = ctx, table = table, fire = fire
+                        };
+                        st[sp++] = Host.Call(f, ha);
+                        break;
+                    }
 
                     case Op.ADD: st[sp - 2] = st[sp - 2] + st[sp - 1]; sp--; break;
                     case Op.SUB: st[sp - 2] = st[sp - 2] - st[sp - 1]; sp--; break;

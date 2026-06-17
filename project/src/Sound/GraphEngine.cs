@@ -258,26 +258,65 @@ namespace Cue.Sound
             }
         }
 
-        // Runs every script's hooks. For v1 all three hooks fire here each frame
-        // (precise FixedUpdate/LateUpdate timing can be wired later); they read
-        // signals via $name, write the value table via $name=, and fire().
-        private void RunScripts(float dt)
+        // Resolves `import "name"` to a sibling script's source (cached delegate
+        // so it's assigned without allocation each frame).
+        private Func<string, string> importResolver_ = null;
+        private Func<string, string> ImportResolver
         {
-            if (scripts_.Count == 0)
-                return;
+            get
+            {
+                if (importResolver_ == null)
+                    importResolver_ = ResolveImport;
+                return importResolver_;
+            }
+        }
+        private string ResolveImport(string name)
+        {
+            for (int i = 0; i < scripts_.Count; ++i)
+                if (scripts_[i].name == name) return scripts_[i].source;
+            return null;
+        }
 
+        private void PrepCtx()
+        {
             logicCtx_.Vars = vars_;
             logicCtx_.Custom = customVars_;
             logicCtx_.Person = person_;
             logicCtx_.Rng = rng_;
             logicCtx_.Now = elapsed_;
+        }
 
+        // Update/Heartbeat + RenderStepped hooks run on the render frame. The
+        // `fixed` hook runs separately from FixedUpdate (see below) so physics
+        // logic ticks at the real fixed timestep.
+        private void RunScripts(float dt)
+        {
+            if (scripts_.Count == 0)
+                return;
+
+            PrepCtx();
             for (int i = 0; i < scripts_.Count; ++i)
             {
                 var sc = scripts_[i];
+                sc.Imports = ImportResolver;
                 sc.RunHook(Hook.Update, logicCtx_, customVars_, FireCustom);
-                sc.RunHook(Hook.Fixed,  logicCtx_, customVars_, FireCustom);
                 sc.RunHook(Hook.Late,   logicCtx_, customVars_, FireCustom);
+            }
+        }
+
+        // Called from Person.FixedUpdate -> the `on fixed { }` hook runs at the
+        // physics timestep, matching Roblox-style PostSimulation semantics.
+        public void FixedUpdate(float dt)
+        {
+            if (scripts_.Count == 0)
+                return;
+
+            PrepCtx();
+            for (int i = 0; i < scripts_.Count; ++i)
+            {
+                var sc = scripts_[i];
+                sc.Imports = ImportResolver;
+                sc.RunHook(Hook.Fixed, logicCtx_, customVars_, FireCustom);
             }
         }
 

@@ -1220,7 +1220,14 @@ namespace Cue
             else
                 scriptInfo_.Text = "instr/frame: " + sc.lastInstr +
                     "   vars: " + sc.totalVars +
+                    "   mem: " + FormatBytes(sc.memBytes) +
                     "   " + sc.lastMicros.ToString("0.0") + " us";
+        }
+
+        private static string FormatBytes(int b)
+        {
+            if (b < 1024) return b + " B";
+            return (b / 1024f).ToString("0.0") + " KB";
         }
 
         private void OnScriptSelected(Sound.Script s) { if (!ignore_) ShowSelectedScript(); }

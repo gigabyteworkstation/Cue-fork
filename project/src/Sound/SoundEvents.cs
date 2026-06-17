@@ -299,6 +299,13 @@ namespace Cue.Sound
                 graph_.Update(s);
         }
 
+        // Drives the scripts' `on fixed { }` hook at the physics timestep.
+        public void FixedUpdate(float s)
+        {
+            if (GraphMode)
+                graph_.FixedUpdate(s);
+        }
+
         // Resolves body-part references and pair-state arrays. Runs every
         // couple of seconds, never per frame.
         private void Rebuild()

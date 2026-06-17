@@ -321,6 +321,9 @@ namespace Cue
 				}
 				Instrumentation.End();
 			}
+
+			if (sounds_ != null)
+				sounds_.FixedUpdate(s);
 		}
 
 		public override void Update(float s)
