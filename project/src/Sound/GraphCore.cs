@@ -64,8 +64,10 @@ namespace Cue.Sound
 
 
     // Per-person signal table plus the bits of per-instance state a running
-    // graph needs. Passed by reference down the node tree.
-    public class SoundContext
+    // graph needs. Passed by reference down the node tree. Also acts as the
+    // variable resolver for formula expressions (signal name -> value, then
+    // custom/probe/modulator vars by name).
+    public class SoundContext : IVarResolver
     {
         public float[] Vars;                  // global signals (size GVar.TableCount)
         public Dictionary<string, float> Custom; // probe outputs, by user-chosen name
@@ -81,6 +83,16 @@ namespace Cue.Sound
             if (Custom != null && name != null && Custom.TryGetValue(name, out v))
                 return v;
             return 0f;
+        }
+
+        // IVarResolver: resolve a name to a value (built-in signal first, then a
+        // custom/probe/modulator variable).
+        public float Resolve(string name)
+        {
+            int id = GVar.FromName(name);
+            if (id >= 0)
+                return GetVar(id);
+            return GetCustom(name);
         }
 
         public float GetVar(int id)
@@ -166,13 +178,30 @@ namespace Cue.Sound
         public float  constant = 1f;
         public int    varId = -1;       // built-in signal id, -1 => use constant
         public string varName = null;   // custom (probe) variable name; wins over varId
+        public string formula = null;   // expression; wins over everything else
         public Curve  curve = null;      // optional remap of the variable
+
+        private Expr  expr_ = null;     // parsed formula cache
+        private string exprFrom_ = null;
 
         public GraphValue() { }
         public GraphValue(float c) { constant = c; }
 
         public float Get(SoundContext ctx)
         {
+            // formula (literal expression) has top priority
+            if (!string.IsNullOrEmpty(formula))
+            {
+                if (expr_ == null || exprFrom_ != formula)
+                {
+                    expr_ = Expr.Parse(formula);
+                    exprFrom_ = formula;
+                }
+                float fv = expr_.Eval(ctx);
+                if (curve != null) fv = curve.Evaluate(fv);
+                return fv;
+            }
+
             float v;
 
             if (!string.IsNullOrEmpty(varName))
@@ -206,6 +235,8 @@ namespace Cue.Sound
             o.Add("v", new JSONData(varId));
             if (!string.IsNullOrEmpty(varName))
                 o.Add("vn", varName);
+            if (!string.IsNullOrEmpty(formula))
+                o.Add("f", formula);
             if (curve != null)
                 o.Add("curve", curve.ToJSON());
             return o;
@@ -220,6 +251,7 @@ namespace Cue.Sound
             J.OptFloat(o, "k", ref g.constant);
             J.OptInt(o, "v", ref g.varId);
             g.varName = J.OptString(o, "vn", null);
+            g.formula = J.OptString(o, "f", null);
             if (o.HasKey("curve"))
                 g.curve = Curve.FromJSON(o["curve"].AsObject);
             return g;

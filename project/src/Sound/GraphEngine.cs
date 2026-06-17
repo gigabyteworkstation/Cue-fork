@@ -235,41 +235,24 @@ namespace Cue.Sound
             }
         }
 
-        private void UpdateLogic()
+        private readonly SoundContext logicCtx_ = new SoundContext();
+
+        private void UpdateLogic(float dt)
         {
             if (logic_.Count == 0)
                 return;
 
-            var lctx = new SoundContext
-            {
-                Vars = vars_,
-                Custom = customVars_,
-                Person = person_,
-                Rng = rng_,
-                Now = elapsed_
-            };
+            logicCtx_.Vars = vars_;
+            logicCtx_.Custom = customVars_;
+            logicCtx_.Person = person_;
+            logicCtx_.Rng = rng_;
+            logicCtx_.Now = elapsed_;
 
             for (int i = 0; i < logic_.Count; ++i)
             {
                 var op = logic_[i];
-                if (!op.enabled)
-                    continue;
-
-                float a = op.a.Get(lctx);
-                float b = op.b.Get(lctx);
-
-                if (op.kind == LogicKind.Assign)
-                {
-                    if (!string.IsNullOrEmpty(op.outVar))
-                        customVars_[op.outVar] = MathOp.Apply(op.op, a, b);
-                }
-                else // Trigger (rising edge)
-                {
-                    bool cond = CmpOp.Apply(op.cmp, a, b);
-                    if (cond && !op.lastCond)
-                        FireCustom(op.triggerName);
-                    op.lastCond = cond;
-                }
+                if (op.enabled)
+                    op.Eval(logicCtx_, dt, customVars_, FireCustom);
             }
         }
 
@@ -285,7 +268,7 @@ namespace Cue.Sound
                 customVars_[kv.Key] = kv.Value;
 
             RefreshSignals();
-            UpdateLogic();
+            UpdateLogic(s);
 
             if (!startedAlways_)
             {

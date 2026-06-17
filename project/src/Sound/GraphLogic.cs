@@ -1,73 +1,150 @@
+using System;
 using System.Collections.Generic;
 using SimpleJSON;
 using UnityEngine;
 
 namespace Cue.Sound
 {
-    // Comparison operators for logic triggers (const ints, never an enum).
+    // Kept for the math NODE (binary op of two GraphValues). The logic layer
+    // below is now formula-driven instead of using these.
     public static class CmpOp
     {
-        public const int Greater = 0;
-        public const int Less    = 1;
-        public const int GEqual  = 2;
-        public const int LEqual  = 3;
-        public const int Equal   = 4;
-        public const int NEqual  = 5;
-
+        public const int Greater = 0, Less = 1, GEqual = 2, LEqual = 3, Equal = 4, NEqual = 5;
         public static readonly string[] Names = new string[]
         { "a > b", "a < b", "a >= b", "a <= b", "a == b", "a != b" };
-
-        public static bool Apply(int op, float a, float b)
-        {
-            switch (op)
-            {
-                case Greater: return a > b;
-                case Less:    return a < b;
-                case GEqual:  return a >= b;
-                case LEqual:  return a <= b;
-                case Equal:   return Mathf.Abs(a - b) < 1e-4f;
-                case NEqual:  return Mathf.Abs(a - b) >= 1e-4f;
-            }
-            return false;
-        }
     }
 
+    // Modulator kinds. A modulator is evaluated every frame and writes one named
+    // variable (or fires a trigger). The value comes from a literal formula, so
+    // anything in the value table can drive anything -- "modulate everything".
     public static class LogicKind
     {
-        public const int Assign  = 0;   // outVar = a OP b
-        public const int Trigger = 1;   // fire triggerName when (a CMP b) becomes true
+        public const int Set      = 0;   // out = formula
+        public const int Trigger  = 1;   // fire trigger on rising edge of formula
+        public const int Slew     = 2;   // out slews toward formula at `rate`/sec
+        public const int Smooth   = 3;   // out = lerp(out, formula, dt*rate)
+        public const int Envelope = 4;   // formula triggers an A/H/R envelope -> out
 
-        public static readonly string[] Names = new string[] { "set variable", "fire trigger" };
+        public static readonly string[] Names = new string[]
+        { "set = formula", "trigger when", "slew toward", "smooth toward", "envelope (A/H/R)" };
     }
 
 
-    // One per-frame logic rule: either assigns a computed value to a named
-    // variable, or fires a named custom trigger on the rising edge of a
-    // comparison. This is the "save variables / compare / calculate" layer.
+    // One modulator. Formula is the input/condition; depending on kind it either
+    // assigns a variable, fires a trigger, or runs a stateful slew/smooth/
+    // envelope. No C# enums (VaM-safe).
     public class LogicOp
     {
         public bool enabled = true;
-        public int kind = LogicKind.Assign;
-        public GraphValue a = GraphValue.Const(0f);
-        public GraphValue b = GraphValue.Const(0f);
-        public int op  = MathOp.Mul;      // for Assign
-        public int cmp = CmpOp.Greater;   // for Trigger
-        public string outVar = "";        // Assign target variable
-        public string triggerName = "";   // Trigger to fire
+        public int kind = LogicKind.Set;
+        public string outVar = "";        // Set/Slew/Smooth/Envelope output
+        public string triggerName = "";   // Trigger output
+        public string formula = "";       // value / condition / input
 
-        public bool lastCond = false;     // runtime (rising-edge memory)
+        public float rate = 5f;           // slew units/sec, or smooth lerp rate
+        public float attack = 0.05f, hold = 0f, release = 0.3f;  // envelope
+
+        // ---- runtime ----
+        private Expr expr_ = null;
+        private string exprFrom_ = null;
+        private bool lastCond_ = false;
+        private float val_ = 0f;
+        private bool valInit_ = false;
+        private bool envOn_ = false, envRel_ = false;
+        private float envT_ = 0f, envRelT_ = 0f;
+
+        private float F(SoundContext ctx)
+        {
+            if (expr_ == null || exprFrom_ != formula)
+            {
+                expr_ = Expr.Parse(formula);
+                exprFrom_ = formula;
+            }
+            return expr_.Eval(ctx);
+        }
+
+        public void Eval(SoundContext ctx, float dt, Dictionary<string, float> vars, Action<string> fire)
+        {
+            switch (kind)
+            {
+                case LogicKind.Set:
+                {
+                    if (!string.IsNullOrEmpty(outVar))
+                        vars[outVar] = F(ctx);
+                    break;
+                }
+
+                case LogicKind.Trigger:
+                {
+                    bool c = F(ctx) != 0f;
+                    if (c && !lastCond_ && fire != null)
+                        fire(triggerName);
+                    lastCond_ = c;
+                    break;
+                }
+
+                case LogicKind.Slew:
+                {
+                    float t = F(ctx);
+                    if (!valInit_) { val_ = t; valInit_ = true; }
+                    val_ = Mathf.MoveTowards(val_, t, rate * dt);
+                    if (!string.IsNullOrEmpty(outVar)) vars[outVar] = val_;
+                    break;
+                }
+
+                case LogicKind.Smooth:
+                {
+                    float t = F(ctx);
+                    if (!valInit_) { val_ = t; valInit_ = true; }
+                    val_ = Mathf.Lerp(val_, t, Mathf.Clamp01(dt * rate));
+                    if (!string.IsNullOrEmpty(outVar)) vars[outVar] = val_;
+                    break;
+                }
+
+                case LogicKind.Envelope:
+                {
+                    bool c = F(ctx) != 0f;
+                    if (c && !lastCond_) { envOn_ = true; envRel_ = false; envT_ = 0f; envRelT_ = 0f; }
+                    lastCond_ = c;
+
+                    float env = 0f;
+                    if (envOn_)
+                    {
+                        envT_ += dt;
+                        if (envT_ < attack)
+                            env = (attack > 0f) ? envT_ / attack : 1f;
+                        else if (!envRel_)
+                        {
+                            env = 1f;
+                            bool holdDone = (hold > 0f) ? (envT_ >= attack + hold) : !c;
+                            if (holdDone) { envRel_ = true; envRelT_ = 0f; }
+                        }
+                        else
+                        {
+                            envRelT_ += dt;
+                            env = (release > 0f) ? Mathf.Clamp01(1f - envRelT_ / release) : 0f;
+                            if (env <= 0.001f) envOn_ = false;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(outVar)) vars[outVar] = Mathf.Clamp01(env);
+                    break;
+                }
+            }
+        }
 
         public JSONClass ToJSON()
         {
             var o = new JSONClass();
             o.Add("enabled", new JSONData(enabled));
             o.Add("kind", new JSONData(kind));
-            o.Add("a", a.ToJSON());
-            o.Add("b", b.ToJSON());
-            o.Add("op", new JSONData(op));
-            o.Add("cmp", new JSONData(cmp));
             o.Add("outVar", outVar);
             o.Add("triggerName", triggerName);
+            o.Add("formula", formula);
+            o.Add("rate", new JSONData(rate));
+            o.Add("attack", new JSONData(attack));
+            o.Add("hold", new JSONData(hold));
+            o.Add("release", new JSONData(release));
             return o;
         }
 
@@ -77,24 +154,23 @@ namespace Cue.Sound
             var l = new LogicOp();
             bool e = true; J.OptBool(o, "enabled", ref e); l.enabled = e;
             J.OptInt(o, "kind", ref l.kind);
-            if (o.HasKey("a")) l.a = GraphValue.FromJSON(o["a"]);
-            if (o.HasKey("b")) l.b = GraphValue.FromJSON(o["b"]);
-            J.OptInt(o, "op", ref l.op);
-            J.OptInt(o, "cmp", ref l.cmp);
             l.outVar = J.OptString(o, "outVar", "");
             l.triggerName = J.OptString(o, "triggerName", "");
+            l.formula = J.OptString(o, "formula", "");
+            J.OptFloat(o, "rate", ref l.rate);
+            J.OptFloat(o, "attack", ref l.attack);
+            J.OptFloat(o, "hold", ref l.hold);
+            J.OptFloat(o, "release", ref l.release);
             return l;
         }
 
         public override string ToString()
         {
-            if (kind == LogicKind.Trigger)
-                return "fire '" + triggerName + "' when " + CmpOp.Names[U.Clamp(cmp, 0, 5)] +
-                       (enabled ? "" : "  [off]");
-
-            return (string.IsNullOrEmpty(outVar) ? "?" : outVar) + " = " +
-                   MathOp.Names[U.Clamp(op, 0, MathOp.Names.Length - 1)] +
-                   (enabled ? "" : "  [off]");
+            string k = LogicKind.Names[U.Clamp(kind, 0, LogicKind.Names.Length - 1)];
+            string target = (kind == LogicKind.Trigger)
+                ? ("'" + triggerName + "'")
+                : (string.IsNullOrEmpty(outVar) ? "?" : outVar);
+            return target + ": " + k + (enabled ? "" : "  [off]");
         }
     }
 }
