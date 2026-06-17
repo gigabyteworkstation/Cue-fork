@@ -117,6 +117,7 @@ namespace Cue.Sound
         // are read by GraphValue.varName. Shared with every running instance.
         private readonly Dictionary<string, float> customVars_ = new Dictionary<string, float>();
         private readonly List<LogicOp> logic_ = new List<LogicOp>();
+        private readonly List<Script> scripts_ = new List<Script>();
 
         private class Running
         {
@@ -142,6 +143,7 @@ namespace Cue.Sound
         public int RunningCount { get { return running_.Count; } }
         public PhysicsProbeManager Probes { get { return probes_; } }
         public List<LogicOp> Logic { get { return logic_; } }
+        public List<Script> Scripts { get { return scripts_; } }
         public Dictionary<string, float> CustomVars { get { return customVars_; } }
 
         // ---- signals & events --------------------------------------------
@@ -256,6 +258,29 @@ namespace Cue.Sound
             }
         }
 
+        // Runs every script's hooks. For v1 all three hooks fire here each frame
+        // (precise FixedUpdate/LateUpdate timing can be wired later); they read
+        // signals via $name, write the value table via $name=, and fire().
+        private void RunScripts(float dt)
+        {
+            if (scripts_.Count == 0)
+                return;
+
+            logicCtx_.Vars = vars_;
+            logicCtx_.Custom = customVars_;
+            logicCtx_.Person = person_;
+            logicCtx_.Rng = rng_;
+            logicCtx_.Now = elapsed_;
+
+            for (int i = 0; i < scripts_.Count; ++i)
+            {
+                var sc = scripts_[i];
+                sc.RunHook(Hook.Update, logicCtx_, customVars_, FireCustom);
+                sc.RunHook(Hook.Fixed,  logicCtx_, customVars_, FireCustom);
+                sc.RunHook(Hook.Late,   logicCtx_, customVars_, FireCustom);
+            }
+        }
+
         public void Update(float s)
         {
             elapsed_ += s;
@@ -269,6 +294,7 @@ namespace Cue.Sound
 
             RefreshSignals();
             UpdateLogic(s);
+            RunScripts(s);
 
             if (!startedAlways_)
             {
@@ -374,6 +400,11 @@ namespace Cue.Sound
                 la.Add(logic_[i].ToJSON());
             o.Add("logic", la);
 
+            var sa = new JSONArray();
+            for (int i = 0; i < scripts_.Count; ++i)
+                sa.Add(scripts_[i].ToJSON());
+            o.Add("scripts", sa);
+
             return o;
         }
 
@@ -409,6 +440,20 @@ namespace Cue.Sound
                     {
                         var l = LogicOp.FromJSON(n.AsObject);
                         if (l != null) logic_.Add(l);
+                    }
+                }
+            }
+
+            scripts_.Clear();
+            if (o.HasKey("scripts"))
+            {
+                var sa = o["scripts"].AsArray;
+                if (sa != null)
+                {
+                    foreach (JSONNode n in sa)
+                    {
+                        var sc = Script.FromJSON(n.AsObject);
+                        if (sc != null) scripts_.Add(sc);
                     }
                 }
             }

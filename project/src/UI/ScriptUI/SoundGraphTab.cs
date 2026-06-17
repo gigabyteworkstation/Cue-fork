@@ -37,7 +37,14 @@ namespace Cue
         // section selector: only one of these groups is visible at a time, so
         // each section gets the full panel height (VUI has no scroll container)
         private VUI.ComboBox<string> section_;
-        private VUI.Panel patchGroup_, probeGroup_, logicGroup_;
+        private VUI.Panel patchGroup_, probeGroup_, logicGroup_, scriptGroup_;
+
+        // ---- scripts
+        private VUI.ComboBox<Sound.Script> scriptList_;
+        private VUI.TextBox scriptName_;
+        private VUI.CheckBox scriptEnabled_;
+        private VUI.TextBox scriptSource_;
+        private VUI.Label scriptInfo_;
 
         // ---- logic / modulators (formula-driven)
         private VUI.ComboBox<Sound.LogicOp> logicList_;
@@ -86,7 +93,7 @@ namespace Cue
         // last-seen engine list sizes, so the tab self-heals when data is loaded
         // AFTER the UI was built (the plugin builds its UI before CheckConfig
         // restores the saved graph)
-        private int seenPatches_ = -1, seenProbes_ = -1, seenLogic_ = -1, seenSets_ = -1;
+        private int seenPatches_ = -1, seenProbes_ = -1, seenLogic_ = -1, seenSets_ = -1, seenScripts_ = -1;
 
         private readonly List<NodeRef> nodeRefs_ = new List<NodeRef>();
         private readonly List<string> partNames_ = new List<string>();
@@ -106,6 +113,8 @@ namespace Cue
             ShowSelectedProbe();
             RefreshLogicList();
             ShowSelectedLogic();
+            RefreshScriptList();
+            ShowSelectedScript();
         }
 
         public override bool DebugOnly { get { return false; } }
@@ -185,21 +194,24 @@ namespace Cue
             var top = new VUI.Panel(new VUI.HorizontalFlow(6));
             top.Add(new VUI.Label("Section:"));
             section_ = top.Add(new VUI.ComboBox<string>(
-                new string[] { "Patches", "Physics probes", "Logic" }, OnSection));
+                new string[] { "Patches", "Physics probes", "Logic", "Scripts" }, OnSection));
             section_.MinimumSize = new VUI.Size(180, VUI.Widget.DontCare);
             Add(top);
 
-            patchGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
-            probeGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
-            logicGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
+            patchGroup_  = new VUI.Panel(new VUI.VerticalFlow(3));
+            probeGroup_  = new VUI.Panel(new VUI.VerticalFlow(3));
+            logicGroup_  = new VUI.Panel(new VUI.VerticalFlow(3));
+            scriptGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
 
             BuildPatchGroup();
             BuildProbeGroup();
             BuildLogicGroup();
+            BuildScriptGroup();
 
             Add(patchGroup_);
             Add(probeGroup_);
             Add(logicGroup_);
+            Add(scriptGroup_);
 
             ShowSection(0);
         }
@@ -208,9 +220,35 @@ namespace Cue
 
         private void ShowSection(int i)
         {
-            patchGroup_.Visible = (i == 0);
-            probeGroup_.Visible = (i == 1);
-            logicGroup_.Visible = (i == 2);
+            patchGroup_.Visible  = (i == 0);
+            probeGroup_.Visible  = (i == 1);
+            logicGroup_.Visible  = (i == 2);
+            scriptGroup_.Visible = (i == 3);
+        }
+
+        private void BuildScriptGroup()
+        {
+            scriptGroup_.Add(new VUI.Label("Scripts", UnityEngine.FontStyle.Bold));
+
+            var s1 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            scriptList_ = s1.Add(new VUI.ComboBox<Sound.Script>(OnScriptSelected));
+            scriptList_.MinimumSize = new VUI.Size(240, VUI.Widget.DontCare);
+            s1.Add(new VUI.Button("Add", OnAddScript));
+            s1.Add(new VUI.Button("Remove", OnRemoveScript));
+            scriptEnabled_ = s1.Add(new VUI.CheckBox("Enabled", OnScriptEnabled));
+            scriptGroup_.Add(s1);
+
+            var s2 = new VUI.Panel(new VUI.HorizontalFlow(6));
+            s2.Add(new VUI.Label("Name:"));
+            scriptName_ = s2.Add(new VUI.TextBox("", "script name", OnScriptName));
+            scriptName_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
+            scriptGroup_.Add(s2);
+
+            scriptInfo_ = scriptGroup_.Add(new VUI.Label("--"));
+
+            scriptSource_ = scriptGroup_.Add(new VUI.TextBox("", "code...", OnScriptSource));
+            scriptSource_.InputField.lineType = VUI.CustomInputField.LineType.MultiLineNewline;
+            scriptSource_.MinimumSize = new VUI.Size(470, 230);
         }
 
         private void BuildPatchGroup()
@@ -1029,6 +1067,12 @@ namespace Cue
                 ShowSelectedLogic();
             }
 
+            if (ScriptList != null && ScriptList.Count != seenScripts_)
+            {
+                RefreshScriptList();
+                ShowSelectedScript();
+            }
+
             int sets = Sound.SoundManager.Instance.Sets.Count;
             if (sets != seenSets_)
             {
@@ -1036,6 +1080,10 @@ namespace Cue
                 // refresh the clip-set dropdown for the currently-shown node
                 ShowSelectedNode();
             }
+
+            // live profiling readout for the selected script
+            if (scriptGroup_.Visible && scriptList_.Selected != null)
+                UpdateScriptInfo();
         }
 
         private void ShowSelectedLogic()
@@ -1125,6 +1173,105 @@ namespace Cue
         private void OnLogicEnvR(float f)   { if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.release = f; Save(); } }
         private void OnLogicOutVar(string s){ if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.outVar = s; RelabelLogic(); Save(); } }
         private void OnLogicTrigName(string s){ if (!ignore_ && logicList_.Selected != null) { logicList_.Selected.triggerName = s; RelabelLogic(); Save(); } }
+
+        // ===================== SCRIPTS =====================
+
+        private List<Sound.Script> ScriptList
+        {
+            get { return Engine != null ? Engine.Scripts : null; }
+        }
+
+        private void RefreshScriptList()
+        {
+            if (ScriptList == null) return;
+            ignore_ = true;
+            scriptList_.SetItems(ScriptList);
+            ignore_ = false;
+            seenScripts_ = ScriptList.Count;
+        }
+
+        private void ShowSelectedScript()
+        {
+            ignore_ = true;
+            var sc = scriptList_.Selected;
+            if (sc != null)
+            {
+                scriptName_.Text = sc.name;
+                scriptEnabled_.Checked = sc.enabled;
+                scriptSource_.Text = sc.source;
+            }
+            else
+            {
+                scriptName_.Text = "";
+                scriptSource_.Text = "";
+            }
+            UpdateScriptInfo();
+            ignore_ = false;
+        }
+
+        private void UpdateScriptInfo()
+        {
+            var sc = scriptList_.Selected;
+            if (sc == null) { scriptInfo_.Text = "--"; return; }
+
+            string err = sc.Error;
+            if (!string.IsNullOrEmpty(err))
+                scriptInfo_.Text = "ERROR: " + err;
+            else
+                scriptInfo_.Text = "instr/frame: " + sc.lastInstr +
+                    "   vars: " + sc.totalVars +
+                    "   " + sc.lastMicros.ToString("0.0") + " us";
+        }
+
+        private void OnScriptSelected(Sound.Script s) { if (!ignore_) ShowSelectedScript(); }
+
+        private void OnAddScript()
+        {
+            if (ScriptList == null) return;
+            ScriptList.Add(new Sound.Script { name = "script" + (ScriptList.Count + 1), source = "" });
+            RefreshScriptList();
+            scriptList_.Select(ScriptList.Count - 1);
+            ShowSelectedScript();
+            Save();
+        }
+
+        private void OnRemoveScript()
+        {
+            if (ScriptList == null || scriptList_.Selected == null) return;
+            ScriptList.Remove(scriptList_.Selected);
+            RefreshScriptList();
+            ShowSelectedScript();
+            Save();
+        }
+
+        private void OnScriptName(string s)
+        {
+            if (ignore_ || scriptList_.Selected == null) return;
+            var cur = scriptList_.Selected;
+            cur.name = s;
+            int idx = ScriptList.IndexOf(cur);
+            ignore_ = true;
+            scriptList_.SetItems(ScriptList);
+            if (idx >= 0) scriptList_.Select(idx);
+            ignore_ = false;
+            Save();
+        }
+
+        private void OnScriptEnabled(bool b)
+        {
+            if (ignore_ || scriptList_.Selected == null) return;
+            scriptList_.Selected.enabled = b;
+            Save();
+        }
+
+        private void OnScriptSource(string s)
+        {
+            if (ignore_ || scriptList_.Selected == null) return;
+            scriptList_.Selected.source = s;
+            scriptList_.Selected.Compile();   // surface errors immediately
+            UpdateScriptInfo();
+            Save();
+        }
 
         private void Save()
         {

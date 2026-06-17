@@ -8,6 +8,8 @@ project\src\Sound\SoundSet.cs
 project\src\Sound\SoundPlayer.cs
 project\src\Sound\SoundEvents.cs
 project\src\Sound\Expr.cs
+project\src\Sound\Script.cs
+project\src\Sound\ScriptCompiler.cs
 project\src\Sound\GraphCore.cs
 project\src\Sound\GraphNodes.cs
 project\src\Sound\GraphEngine.cs
