@@ -59,6 +59,10 @@ namespace Cue.Sound
                 "playfile(\"file\", vol=1, pitch=1) plays a cached audio file");
             Reg("playbundle", "s s f f", PlayBundle,
                 "playbundle(\"bundle\", \"clip\", vol=1, pitch=1) plays a bundle clip");
+            Reg("bundleclips", "s", BundleClips,
+                "bundleclips(\"bundle\") -> number of clips in a loaded bundle");
+            Reg("hasclip", "s s", HasClip,
+                "hasclip(\"bundle\", \"clip\") -> 1 if the bundle has that clip");
 
             // --- value table ----------------------------------------------
             Reg("get", "s", GetVar, "get(\"name\") -> shared table / signal value");
@@ -163,6 +167,16 @@ namespace Cue.Sound
             string path = a.S(0);
             AssetManager.Instance.LoadBundle(path);
             return AssetManager.Instance.BundleReady(path) ? 1f : 0f;
+        }
+
+        private static float BundleClips(Args a)
+        {
+            return AssetManager.Instance.BundleClipCount(a.S(0));
+        }
+
+        private static float HasClip(Args a)
+        {
+            return AssetManager.Instance.BundleHasClip(a.S(0), a.S(1)) ? 1f : 0f;
         }
 
         private static float PlayFile(Args a)

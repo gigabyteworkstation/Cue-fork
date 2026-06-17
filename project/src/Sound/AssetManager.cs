@@ -33,7 +33,11 @@ namespace Cue.Sound
             public string path;
             public bool ready;
             public bool failed;
-            public AssetBundle bundle;
+            // Held as UnityEngine.Object because AssetBundle (in the split
+            // AssetBundleModule assembly) is not a nameable type in VaM's
+            // compiler — we only ever touch it via the request property.
+            public UnityEngine.Object bundle;
+            public readonly List<string> clipNames = new List<string>();
             public readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
         }
         private readonly Dictionary<string, Bundle> bundles_ = new Dictionary<string, Bundle>();
@@ -115,13 +119,17 @@ namespace Cue.Sound
             try
             {
                 if (r.assetBundle == null) { b.failed = true; return; }
-                b.bundle = r.assetBundle;
+                b.bundle = r.assetBundle;   // implicit upcast; type name never spelled
 
                 var clips = r.assetBundle.LoadAllAssets<AudioClip>();
                 if (clips != null)
                 {
                     for (int i = 0; i < clips.Length; ++i)
+                    {
                         b.clips[clips[i].name] = clips[i];
+                        b.clipNames.Add(clips[i].name);
+                    }
+                    b.clipNames.Sort(StringComparer.OrdinalIgnoreCase);
                 }
 
                 b.ready = true;
@@ -143,12 +151,41 @@ namespace Cue.Sound
             return b.clips.TryGetValue(clip, out c) ? c : null;
         }
 
-        // Raw bundle for non-audio assets (textures, prefabs, ...) — the seam
-        // for future host functions.
-        public AssetBundle GetBundle(string path)
+        // Raw bundle object (as UnityEngine.Object) for non-audio assets — the
+        // seam for future host functions; callers cast as needed.
+        public UnityEngine.Object GetBundle(string path)
         {
             Bundle b;
             return (bundles_.TryGetValue(path, out b) && b.ready) ? b.bundle : null;
+        }
+
+        // The names of every audio clip a loaded bundle contains, so the UI /
+        // scripts can discover what's inside it. Empty until the bundle is ready.
+        public List<string> BundleClipNames(string path)
+        {
+            Bundle b;
+            return (bundles_.TryGetValue(path, out b)) ? b.clipNames : EmptyNames;
+        }
+        private static readonly List<string> EmptyNames = new List<string>();
+
+        public int BundleClipCount(string path)
+        {
+            Bundle b;
+            return (bundles_.TryGetValue(path, out b)) ? b.clipNames.Count : 0;
+        }
+
+        public bool BundleHasClip(string path, string clip)
+        {
+            Bundle b;
+            return bundles_.TryGetValue(path, out b) && b.clips.ContainsKey(clip);
+        }
+
+        // Bundle paths currently cached (for the Assets UI panel).
+        public IEnumerable<string> BundlePaths { get { return bundles_.Keys; } }
+        public bool BundleFailed(string path)
+        {
+            Bundle b;
+            return bundles_.TryGetValue(path, out b) && b.failed;
         }
 
         // ---- lifecycle ----------------------------------------------------
