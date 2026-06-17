@@ -34,6 +34,11 @@ namespace Cue
         private VUI.CheckBox patchEnabled_;
         private VUI.TextBox patchCustom_;
 
+        // section selector: only one of these groups is visible at a time, so
+        // each section gets the full panel height (VUI has no scroll container)
+        private VUI.ComboBox<string> section_;
+        private VUI.Panel patchGroup_, probeGroup_, logicGroup_;
+
         // ---- logic
         private VUI.ComboBox<Sound.LogicOp> logicList_;
         private VUI.CheckBox logicEnabled_;
@@ -170,24 +175,56 @@ namespace Cue
 
         private void Build()
         {
-            // tight spacing: VUI has no scroll container, so we pack rows to fit
-            // as much of the (tall) editor in the panel as possible
-            Layout = new VUI.VerticalFlow(2);
+            Layout = new VUI.VerticalFlow(4);
 
-            Add(new VUI.Label("Patches", UnityEngine.FontStyle.Bold));
+            // section selector (one group visible at a time)
+            var top = new VUI.Panel(new VUI.HorizontalFlow(6));
+            top.Add(new VUI.Label("Section:"));
+            section_ = top.Add(new VUI.ComboBox<string>(
+                new string[] { "Patches", "Physics probes", "Logic" }, OnSection));
+            section_.MinimumSize = new VUI.Size(180, VUI.Widget.DontCare);
+            Add(top);
+
+            patchGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
+            probeGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
+            logicGroup_ = new VUI.Panel(new VUI.VerticalFlow(3));
+
+            BuildPatchGroup();
+            BuildProbeGroup();
+            BuildLogicGroup();
+
+            Add(patchGroup_);
+            Add(probeGroup_);
+            Add(logicGroup_);
+
+            ShowSection(0);
+        }
+
+        private void OnSection(int i) { ShowSection(i); }
+
+        private void ShowSection(int i)
+        {
+            patchGroup_.Visible = (i == 0);
+            probeGroup_.Visible = (i == 1);
+            logicGroup_.Visible = (i == 2);
+        }
+
+        private void BuildPatchGroup()
+        {
+            patchGroup_.Add(new VUI.Label("Patches", UnityEngine.FontStyle.Bold));
 
             var p1 = new VUI.Panel(new VUI.HorizontalFlow(6));
             patches_ = p1.Add(new VUI.ComboBox<Sound.SoundPatch>(OnPatchSelected));
             patches_.MinimumSize = new VUI.Size(280, VUI.Widget.DontCare);
             p1.Add(new VUI.Button("Add", OnAddPatch));
             p1.Add(new VUI.Button("Remove", OnRemovePatch));
-            Add(p1);
+            patchGroup_.Add(p1);
 
             var p2 = new VUI.Panel(new VUI.HorizontalFlow(6));
             p2.Add(new VUI.Label("Name:"));
             patchName_ = p2.Add(new VUI.TextBox("", "patch name", OnPatchName));
             patchEnabled_ = p2.Add(new VUI.CheckBox("Enabled", OnPatchEnabled));
-            Add(p2);
+            patchGroup_.Add(p2);
 
             var p3 = new VUI.Panel(new VUI.HorizontalFlow(6));
             p3.Add(new VUI.Label("Trigger:"));
@@ -195,7 +232,7 @@ namespace Cue
             patchTrigger_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
             p3.Add(new VUI.Label("Interval:"));
             patchInterval_ = p3.Add(new VUI.FloatTextSlider(0f, 0f, 3f, OnPatchInterval));
-            Add(p3);
+            patchGroup_.Add(p3);
 
             var p4 = new VUI.Panel(new VUI.HorizontalFlow(6));
             p4.Add(new VUI.Label("Body part:"));
@@ -204,17 +241,17 @@ namespace Cue
             p4.Add(new VUI.Label("Orifice:"));
             patchOrifice_ = p4.Add(new VUI.ComboBox<string>(Sound.SoundRule.OrificeNames, OnPatchOrifice));
             patchOrifice_.MinimumSize = new VUI.Size(130, VUI.Widget.DontCare);
-            Add(p4);
+            patchGroup_.Add(p4);
 
             var p5 = new VUI.Panel(new VUI.HorizontalFlow(6));
             p5.Add(new VUI.Label("Custom trigger:"));
             patchCustom_ = p5.Add(new VUI.TextBox(
                 "", "blank = use event above; else fired by a logic op", OnPatchCustom));
             patchCustom_.MinimumSize = new VUI.Size(280, VUI.Widget.DontCare);
-            Add(p5);
+            patchGroup_.Add(p5);
 
             // ---- node tree ----
-            Add(new VUI.Label("Node tree", UnityEngine.FontStyle.Bold));
+            patchGroup_.Add(new VUI.Label("Node tree", UnityEngine.FontStyle.Bold));
 
             var n1 = new VUI.Panel(new VUI.HorizontalFlow(6));
             nodeList_ = n1.Add(new VUI.ComboBox<string>(new string[] { "(empty)" }, OnNodeSelected));
@@ -223,16 +260,16 @@ namespace Cue
             nodeAddType_.MinimumSize = new VUI.Size(120, VUI.Widget.DontCare);
             n1.Add(new VUI.Button("Add child", OnAddNode));
             n1.Add(new VUI.Button("Remove", OnRemoveNode));
-            Add(n1);
+            patchGroup_.Add(n1);
 
-            nodeTypeLabel_ = Add(new VUI.Label("node: (none)"));
+            nodeTypeLabel_ = patchGroup_.Add(new VUI.Label("node: (none)"));
 
             var n2 = new VUI.Panel(new VUI.HorizontalFlow(6));
             n2.Add(new VUI.Label("Set:"));
             clipSet_ = n2.Add(new VUI.ComboBox<string>(new string[] { "" }, OnClipSet));
             clipSet_.MinimumSize = new VUI.Size(200, VUI.Widget.DontCare);
             clipLoop_ = n2.Add(new VUI.CheckBox("Loop", OnClipLoop));
-            Add(n2);
+            patchGroup_.Add(n2);
 
             for (int i = 0; i < GvRows; ++i)
             {
@@ -242,7 +279,7 @@ namespace Cue
                 gvSource_[k] = row.Add(new VUI.ComboBox<string>(new string[] { "(constant)" }, (idx) => OnGvSource(k, idx)));
                 gvSource_[k].MinimumSize = new VUI.Size(160, VUI.Widget.DontCare);
                 gvSlider_[k] = row.Add(new VUI.FloatTextSlider(1f, 0f, 2f, (f) => OnGvConst(k, f)));
-                Add(row);
+                patchGroup_.Add(row);
             }
 
             var ne = new VUI.Panel(new VUI.HorizontalFlow(6));
@@ -250,7 +287,7 @@ namespace Cue
             envAttack_  = ne.Add(new VUI.FloatTextSlider(0.02f, 0f, 3f, OnEnvAttack));
             envHold_    = ne.Add(new VUI.FloatTextSlider(0f, 0f, 10f, OnEnvHold));
             envRelease_ = ne.Add(new VUI.FloatTextSlider(0.1f, 0f, 5f, OnEnvRelease));
-            Add(ne);
+            patchGroup_.Add(ne);
 
             var nm = new VUI.Panel(new VUI.HorizontalFlow(6));
             nm.Add(new VUI.Label("Op:"));
@@ -259,10 +296,13 @@ namespace Cue
             nm.Add(new VUI.Label("Modulates:"));
             mathTarget_ = nm.Add(new VUI.ComboBox<string>(Sound.MathTarget.Names, OnMathTarget));
             mathTarget_.MinimumSize = new VUI.Size(100, VUI.Widget.DontCare);
-            Add(nm);
+            patchGroup_.Add(nm);
 
-            // ---- probes ----
-            Add(new VUI.Label("Physics probes", UnityEngine.FontStyle.Bold));
+        }
+
+        private void BuildProbeGroup()
+        {
+            probeGroup_.Add(new VUI.Label("Physics probes", UnityEngine.FontStyle.Bold));
 
             var r1 = new VUI.Panel(new VUI.HorizontalFlow(6));
             probes_ = r1.Add(new VUI.ComboBox<Sound.PhysicsProbe>(OnProbeSelected));
@@ -271,15 +311,15 @@ namespace Cue
             probeAddType_.MinimumSize = new VUI.Size(110, VUI.Widget.DontCare);
             r1.Add(new VUI.Button("Add", OnAddProbe));
             r1.Add(new VUI.Button("Remove", OnRemoveProbe));
-            Add(r1);
+            probeGroup_.Add(r1);
 
             var r2 = new VUI.Panel(new VUI.HorizontalFlow(6));
             r2.Add(new VUI.Label("Name:"));
             probeName_ = r2.Add(new VUI.TextBox("", "variable name", OnProbeName));
             probeEnabled_ = r2.Add(new VUI.CheckBox("Enabled", OnProbeEnabled));
-            Add(r2);
+            probeGroup_.Add(r2);
 
-            probeTypeLabel_ = Add(new VUI.Label("probe: (none)"));
+            probeTypeLabel_ = probeGroup_.Add(new VUI.Label("probe: (none)"));
 
             var r3 = new VUI.Panel(new VUI.HorizontalFlow(6));
             r3.Add(new VUI.Label("Point A:"));
@@ -290,10 +330,13 @@ namespace Cue
             probePartB_.MinimumSize = new VUI.Size(150, VUI.Widget.DontCare);
             r3.Add(new VUI.Label("Radius:"));
             probeRadius_ = r3.Add(new VUI.FloatTextSlider(0.05f, 0f, 0.3f, OnProbeRadius));
-            Add(r3);
+            probeGroup_.Add(r3);
 
-            // ---- logic ----
-            Add(new VUI.Label("Logic (per frame)", UnityEngine.FontStyle.Bold));
+        }
+
+        private void BuildLogicGroup()
+        {
+            logicGroup_.Add(new VUI.Label("Logic (per frame)", UnityEngine.FontStyle.Bold));
 
             var l1 = new VUI.Panel(new VUI.HorizontalFlow(6));
             logicList_ = l1.Add(new VUI.ComboBox<Sound.LogicOp>(OnLogicSelected));
@@ -301,13 +344,13 @@ namespace Cue
             l1.Add(new VUI.Button("Add", OnAddLogic));
             l1.Add(new VUI.Button("Remove", OnRemoveLogic));
             logicEnabled_ = l1.Add(new VUI.CheckBox("Enabled", OnLogicEnabled));
-            Add(l1);
+            logicGroup_.Add(l1);
 
             var l2 = new VUI.Panel(new VUI.HorizontalFlow(6));
             l2.Add(new VUI.Label("Kind:"));
             logicKind_ = l2.Add(new VUI.ComboBox<string>(Sound.LogicKind.Names, OnLogicKind));
             logicKind_.MinimumSize = new VUI.Size(130, VUI.Widget.DontCare);
-            Add(l2);
+            logicGroup_.Add(l2);
 
             for (int i = 0; i < 2; ++i)
             {
@@ -318,7 +361,7 @@ namespace Cue
                     new string[] { "(constant)" }, (idx) => OnLgvSource(k, idx)));
                 lgvSource_[k].MinimumSize = new VUI.Size(160, VUI.Widget.DontCare);
                 lgvSlider_[k] = row.Add(new VUI.FloatTextSlider(0f, -5f, 5f, (f) => OnLgvConst(k, f)));
-                Add(row);
+                logicGroup_.Add(row);
             }
 
             var l3 = new VUI.Panel(new VUI.HorizontalFlow(6));
@@ -328,7 +371,7 @@ namespace Cue
             l3.Add(new VUI.Label("Compare:"));
             logicCmp_ = l3.Add(new VUI.ComboBox<string>(Sound.CmpOp.Names, OnLogicCmp));
             logicCmp_.MinimumSize = new VUI.Size(110, VUI.Widget.DontCare);
-            Add(l3);
+            logicGroup_.Add(l3);
 
             var l4 = new VUI.Panel(new VUI.HorizontalFlow(6));
             l4.Add(new VUI.Label("Out var:"));
@@ -337,7 +380,7 @@ namespace Cue
             l4.Add(new VUI.Label("Trigger:"));
             logicTrigName_ = l4.Add(new VUI.TextBox("", "trigger name", OnLogicTrigName));
             logicTrigName_.MinimumSize = new VUI.Size(140, VUI.Widget.DontCare);
-            Add(l4);
+            logicGroup_.Add(l4);
         }
 
         // ===================== PATCHES =====================
