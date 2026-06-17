@@ -202,6 +202,7 @@ namespace Cue.Sound
         private BodyPart lips_ = null;
 
         private bool lastPenActive_ = false;
+        private float lastPenVel_ = 0f;
         private float lastPenDepth_ = 0f;
         private float entrySpeed_ = 0f;
 
@@ -554,6 +555,20 @@ namespace Cue.Sound
                 else if (v < -ThrustMoveSpeed)
                     Fire(SoundRule.TriggerThrustOut, orifice, pos, spd, now);
 
+                // Also raise an Impact event ON THE ORIFICE'S BODY PART at the
+                // start of each inward stroke. The impact proximity detector
+                // can't see this (it measures the dildo's root, which never
+                // reaches the orifice), so penetration drives it directly --
+                // making "Impact on body part: Vagina" fire while penetrating.
+                bool inwardStart = (v > ThrustMoveSpeed && lastPenVel_ <= ThrustMoveSpeed);
+                if (inwardStart)
+                {
+                    var opart = OrificePart(orifice);
+                    if (opart != BP.None)
+                        FireImpact(opart, pos, Mathf.Abs(v) * 3f);
+                }
+                lastPenVel_ = v;
+
                 lastPenDepth_ = pen.NormalisedDepth;
             }
             else
@@ -562,6 +577,14 @@ namespace Cue.Sound
             }
 
             lastPenActive_ = pen.Active;
+        }
+
+        private BodyPartType OrificePart(string orifice)
+        {
+            if (orifice == "Vagina") return BP.Vagina;
+            if (orifice == "Anus")   return BP.Anus;
+            if (orifice == "Mouth")  return BP.Lips;
+            return BP.None;
         }
 
         private void UpdateFingering(float s)

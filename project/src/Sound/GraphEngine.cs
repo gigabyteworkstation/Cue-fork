@@ -166,12 +166,18 @@ namespace Cue.Sound
                 if (!string.IsNullOrEmpty(p.customTrigger))
                     continue;
 
-                if (p.trigger == SoundRule.TriggerImpact &&
-                    p.part != BP.None && p.part != args.part)
+                if (p.trigger == SoundRule.TriggerImpact)
+                {
+                    // impacts are filtered by body PART, not orifice (the event
+                    // carries no orifice), so an impact patch that also happens
+                    // to have an orifice set still fires
+                    if (p.part != BP.None && p.part != args.part)
+                        continue;
+                }
+                else if (!p.MatchesOrifice(args.orifice))
+                {
                     continue;
-
-                if (!p.MatchesOrifice(args.orifice))
-                    continue;
+                }
 
                 if (now - p.lastFire < p.minInterval)
                     continue;
